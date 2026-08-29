@@ -1,0 +1,88 @@
+# 5. Adapters and Host Integration
+
+The core stays small by making host integration explicit. Every adapter depends on core; core never depends on an adapter.
+
+## Suggested package boundary
+
+```text
+packages/
+  runtime-core/       # definitions, scopes, resolver, lifecycle, diagnostics
+  runtime-events/     # optional typed event capability
+  runtime-react/      # React contributions and error boundaries
+  runtime-vite/       # Vite HMR bridge
+  runtime-sqlite/     # database capability and migration adapter
+  runtime-test/       # fake host capabilities and leak assertions
+```
+
+The exact package names are not final. The dependency direction is final:
+
+```text
+host application ─┬─ runtime-react
+                  ├─ runtime-vite
+                  ├─ runtime-sqlite
+                  └─ runtime-core
+```
+
+## React adapter
+
+React is an adapter concern. It may define contribution keys such as `react.route`, `react.sidebar-item`, or `react.widget`, but these types must not appear in `runtime-core`.
+
+The adapter is responsible for:
+
+- subscribing to committed contribution snapshots;
+- rendering only committed generations;
+- placing an error boundary around plugin-provided components;
+- removing a generation's components when its scope is disposed;
+- preventing a stale component callback from mutating a newer generation.
+
+React component state is not promised to survive replacement. Persisted application state must use a host-provided storage capability.
+
+## Vite HMR adapter
+
+The HMR adapter maps a module update to `runtime.replace(newDefinition)`. It must not implement its own deactivate-register-activate sequence.
+
+Required behavior:
+
+- module import failure leaves the old generation active;
+- setup failure leaves the old generation active;
+- updates are serialized per plugin ID;
+- removed modules are explicit uninstall operations;
+- a changed provider causes dependent plugins to be revalidated;
+- HMR errors are reported through runtime diagnostics.
+
+Vite's module graph and `import.meta.hot` are not visible to core.
+
+## Database adapter
+
+The database adapter exposes a typed capability such as `database.connection` and optionally a migration service. The core does not know SQL, tables, WASM, IndexedDB, or snapshot formats.
+
+Migration rules:
+
+- migrations are ordered, immutable records;
+- each migration has an owner and checksum;
+- applying a migration is transactional within the database engine;
+- a changed checksum is a hard error, not a silent rerun;
+- plugin stop/uninstall does not roll back schema changes;
+- destructive data removal requires an explicit host operation and backup policy;
+- persistence failures are surfaced as errors and diagnostics.
+
+This prevents the incorrect assumption that plugin lifecycle rollback can undo an already-applied database schema change.
+
+## Event adapter
+
+An event bus can be implemented as a capability. The core should not require one. If provided, subscriptions must be acquired through the plugin scope so they disappear with the generation.
+
+The first event adapter should define:
+
+- typed event maps;
+- synchronous versus asynchronous delivery;
+- error isolation;
+- ordering;
+- behavior when a subscriber is disposed during delivery.
+
+“String event plus `unknown` payload” is an escape hatch, not a general type-safe event API.
+
+## Security
+
+The runtime is an orchestration and ownership library, not a sandbox. A plugin with JavaScript execution privileges can still access any object reachable from its imports or context. Untrusted extensions require a separate process, worker, iframe, permission layer, or capability-based sandbox host.
+
