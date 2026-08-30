@@ -35,6 +35,16 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'unit-dom',
+          root: 'packages/runtime-core',
+          environment: 'happy-dom',
+          globals: true,
+          include: ['test/**/*.test.ts'],
+          exclude: ['test/property/**', 'test/stress/**'],
+        },
+      },
+      {
+        test: {
           name: 'property',
           root: 'packages/runtime-core',
           environment: 'node',

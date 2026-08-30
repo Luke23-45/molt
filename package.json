@@ -12,13 +12,15 @@
   "scripts": {
     "verify": "pnpm -r typecheck && pnpm -r lint && pnpm knip",
     "build": "pnpm -r build",
-    "test": "vitest run",
+    "test": "vitest run --project unit --project unit-dom",
     "test:property": "vitest run --project property",
     "test:stress": "vitest run --project stress",
     "check:pkg": "pnpm -r exec publint && pnpm -r exec attw --pack .",
     "check:arch": "depcruise packages --config .cruiser.json",
     "check:api": "pnpm -r api-extract",
-    "bench": "pnpm --filter ./demo/comparison bench"
+    "bench": "pnpm --filter ./demo/comparison bench",
+    "test:coverage": "vitest run --project unit --coverage",
+    "test:dom": "vitest run --project unit-dom"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
@@ -27,6 +29,7 @@
     "dependency-cruiser": "^18.2.0",
     "eslint": "^10.9.1",
     "eslint-plugin-simple-import-sort": "^14.0.0",
+    "happy-dom": "^20.12.0",
     "knip": "^6.33.0",
     "prettier": "^3.9.6",
     "publint": "^0.3.24",

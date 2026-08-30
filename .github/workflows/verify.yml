@@ -1,9 +1,9 @@
 # Gate wiring: docs/implement_plan/06-ci-release-and-governance.md §1.
 # Gates G1–G10 are defined in docs/implement_plan/02-tooling-and-quality-gates.md §3.
 #
-# Bootstrap note: stages whose enabling ledger items are still open run with
-# continue-on-error (marked inline). Each marker names the ledger item that
-# removes it — those markers are debt, tracked in the ledger, not decoration.
+# Bootstrap note: the demo stage still runs with continue-on-error — its
+# marker names the ledger item (P3-6) that removes it. Every other stage
+# runs for real: the enabling items (P1-E7/E8/E10/E11) have landed.
 name: verify
 
 on:
@@ -34,7 +34,8 @@ jobs:
       - run: pnpm verify
 
   test:
-    # G3 unit + coverage thresholds; G4 property half.
+    # G3 unit + coverage thresholds + happy-dom axis; G4 property half
+    # (fixed seed for stability, one random-seed job per plan 04 §3).
     name: ${{ matrix.suite }} / ${{ matrix.os }} / node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -51,21 +52,25 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: unit suite (G3)
+      - name: unit suite with coverage thresholds (G3)
         if: matrix.suite == 'unit'
-        run: pnpm test --coverage
-      - name: property suite (G4)
+        run: pnpm test:coverage
+      - name: unit suite under happy-dom (G3, plan 04 §5)
+        if: matrix.suite == 'unit'
+        run: pnpm test:dom
+      - name: property suite, fixed seed (G4)
         if: matrix.suite == 'property'
-        # bootstrap: property tests arrive at P1-E7 — remove continue-on-error there
-        continue-on-error: true
+        run: pnpm test:property
+        env:
+          FC_SEED: '20260831'
+      - name: property suite, random seed (G4)
+        if: matrix.suite == 'property' && matrix.os == 'ubuntu-latest' && matrix.node == '24'
         run: pnpm test:property
 
   stress:
     # G4 stress half — nightly and manual, not per-PR (plan 06 §1).
-    # bootstrap: stress tests arrive at P1-E8 — remove continue-on-error there
     name: stress (G4, nightly)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -91,16 +96,10 @@ jobs:
       - name: architecture rules (G6)
         run: pnpm check:arch
       - name: build (dual ESM/CJS)
-        # bootstrap: tsdown and src arrive at P1-E10 — remove continue-on-error there
-        continue-on-error: true
         run: pnpm build
       - name: packaging lint (G7)
-        # bootstrap: dist arrives at P1-E10 — remove continue-on-error there
-        continue-on-error: true
         run: pnpm check:pkg
       - name: tarball clean install (G8)
-        # bootstrap: dist arrives at P1-E10 — remove continue-on-error there
-        continue-on-error: true
         run: |
           mkdir -p /tmp/molt-pack
           pnpm --filter @molt/runtime pack --pack-destination /tmp/molt-pack
@@ -110,19 +109,13 @@ jobs:
           npm install /tmp/molt-pack/*.tgz
           node -e "const m = require('@molt/runtime'); if (!m) process.exit(1);"
       - name: bun smoke (G8, ADR-13)
-        # bootstrap: dist arrives at P1-E10 — remove continue-on-error there
-        continue-on-error: true
         uses: oven-sh/setup-bun@v2
       - name: bun smoke run (G8, ADR-13)
-        # bootstrap: dist arrives at P1-E10 — remove continue-on-error there
-        continue-on-error: true
         run: bun -e "import('@molt/runtime').then((m) => { if (!m) process.exit(1); })"
 
   api:
     # G9 API review diff.
-    # bootstrap: api-extract scripts arrive at P1-E11 — remove continue-on-error there
     name: api review (G9)
-    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -132,6 +125,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - run: pnpm check:api
 
   demo:
