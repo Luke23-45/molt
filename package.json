@@ -1,0 +1,37 @@
+{
+  "name": "molt-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Molt — a general plugin runtime for safe replacement. Root workspace: tooling and scripts only; published code lives in packages/.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.24.0",
+  "scripts": {
+    "verify": "pnpm -r typecheck && pnpm -r lint && pnpm knip",
+    "build": "pnpm -r build",
+    "test": "vitest run",
+    "test:property": "vitest run --project property",
+    "test:stress": "vitest run --project stress",
+    "check:pkg": "pnpm -r exec publint && pnpm -r exec attw --pack .",
+    "check:arch": "depcruise packages --config .cruiser.json",
+    "check:api": "pnpm -r api-extract",
+    "bench": "pnpm --filter ./demo/comparison bench"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@types/node": "^24.13.3",
+    "@vitest/coverage-v8": "^4.1.11",
+    "dependency-cruiser": "^18.2.0",
+    "eslint": "^10.9.1",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
+    "knip": "^6.33.0",
+    "prettier": "^3.9.6",
+    "publint": "^0.3.24",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
+  }
+}

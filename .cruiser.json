@@ -1,0 +1,57 @@
+{
+  "$schema": "https://raw.githubusercontent.com/sverweij/dependency-cruiser/develop/doc/schema.json",
+  "forbidden": [
+    {
+      "name": "core-single-dependency",
+      "severity": "error",
+      "comment": "Gate G6 + ADR-02: runtime-core ships exactly one runtime dependency (semver). This single rule covers every host library (react, vite, sql.js, indexeddb, bun) at once.",
+      "from": { "path": "^packages/runtime-core/src/" },
+      "to": {
+        "path": "node_modules",
+        "pathNot": "\\.pnpm/(semver|@types\\+semver)@"
+      }
+    },
+    {
+      "name": "core-no-node-builtins",
+      "severity": "error",
+      "comment": "Gate G6: the core is environment-neutral; AbortController/EventTarget and friends are host globals, never node: imports.",
+      "from": { "path": "^packages/runtime-core/src/" },
+      "to": { "path": "^node:" }
+    },
+    {
+      "name": "internal-not-importable-across-packages",
+      "severity": "error",
+      "comment": "ADR-01 + note 06: packages/runtime-core/src/internal is unreachable outside runtime-core; the exports map enforces this at packaging time, this rule enforces it at source time.",
+      "from": { "pathNot": "^packages/runtime-core/" },
+      "to": { "path": "^packages/runtime-core/src/internal/" }
+    },
+    {
+      "name": "adapters-depend-on-core-only",
+      "severity": "error",
+      "comment": "Note 05: adapters depend on core; core never depends on an adapter, and adapters never import each other.",
+      "from": { "path": "^packages/(test|events|react|vite|sqlite)/src/" },
+      "to": {
+        "path": "^packages/",
+        "pathNot": "^packages/runtime-core/"
+      }
+    },
+    {
+      "name": "examples-use-core-only",
+      "severity": "error",
+      "comment": "Note 07 Phase 2: the two example hosts share the core package, not application code.",
+      "from": { "path": "^examples/" },
+      "to": {
+        "path": "^packages/",
+        "pathNot": "^packages/runtime-core/"
+      }
+    }
+  ],
+  "options": {
+    "tsConfig": {
+      "fileName": "tsconfig.base.json"
+    },
+    "doNotFollow": {
+      "path": "node_modules"
+    }
+  }
+}
