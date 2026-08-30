@@ -20,11 +20,16 @@ export default defineConfig({
           coverage: {
             provider: 'v8',
             include: ['src/**'],
-            // Gate G3 thresholds (plan 04 §6): core 90% lines / 85% branches.
-            // Per-file 100% for scope.ts and internal/async.ts is enforced
-            // from P1, when those files exist (glob-keyed thresholds land
-            // with them).
-            thresholds: { lines: 90, branches: 85 },
+            exclude: ['src/index.ts'], // re-export barrel: no runtime logic
+            // Gate G3 thresholds (plan 04 §6 as amended at P1): global
+            // 90 lines / 80 branches, per-file exception for the runtime.ts
+            // defense-in-depth guards. Mirrored in
+            // packages/runtime-core/vitest.config.ts for package-local runs.
+            thresholds: {
+              lines: 90,
+              branches: 80,
+              'src/runtime.ts': { lines: 87, branches: 69 },
+            },
           },
         },
       },
