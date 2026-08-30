@@ -13,6 +13,9 @@ results/
 # demo artifacts (RESULTS.md is committed; raw runs are not)
 demo/*/bench-results/
 
+# api-extractor scratch output
+temp/
+
 # tooling
 .eslintcache
 

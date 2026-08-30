@@ -102,9 +102,14 @@ Every published package uses this shape (`@molt/runtime` shown; ADR-07):
   "files": ["dist", "README.md"],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
@@ -123,7 +128,7 @@ Every published package uses this shape (`@molt/runtime` shown; ADR-07):
 }
 ```
 
-Rules the template encodes: `files` whitelists (nothing accidental ships); `exports` has exactly one public entry plus `./package.json`; internal modules are unreachable by construction (note [06](../notes/06-validation-and-release-gates.md) build checks); `sideEffects: false` keeps tree-shaking honest; the semver range is the only dependency core ever declares (ADR-02).
+Rules the template encodes: `files` whitelists (nothing accidental ships); `exports` has exactly one public entry plus `./package.json`; internal modules are unreachable by construction (note [06](../notes/06-validation-and-release-gates.md) build checks); `sideEffects: false` keeps tree-shaking honest; the semver range is the only dependency core ever declares (ADR-02). The `require` condition carries its own `.d.cts` types — a single shared `types` condition masquerades as ESM for CJS consumers and fails gate G7 (publint/attw, confirmed when P1-E10 landed).
 
 ## 5. The file-by-file contract for `runtime-core`
 
