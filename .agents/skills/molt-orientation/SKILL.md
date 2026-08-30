@@ -38,7 +38,7 @@ demo/comparison/           # three-way demo: naive registry vs Cordis vs Molt (P
 
 ## Status check — always do this first
 
-Read the progress log at the bottom of `docs/implement_plan/ledger.md` and the first unchecked item. Never assume a package, script, or gate exists without a checked ledger item saying so. As of the P1 core work (2026-08-30): all `runtime-core` modules exist and 137 unit tests pass, but the property/stress suites (P1-E7/E8), packaging (E10), API review (E11), and root README (E12) are still open — no build output or release exists yet.
+Read the progress log at the bottom of `docs/implement_plan/ledger.md` and the first unchecked item. Never assume a package, script, or gate exists without a checked ledger item saying so. As of the 2026-08-31 session: the core is implemented and packaged (build, publint/attw, and the reviewed API file all exist), the property/stress suites are written but have not been executed yet, and the open items are running E7/E8, the CI matrix (E9, needs the P0-A1 push), and the push itself.
 
 ## Non-negotiables (full lists in the referenced docs)
 

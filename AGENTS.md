@@ -6,7 +6,7 @@ Instructions for AI coding agents working in this repository. Followed by Codex,
 
 **Molt** is a general plugin runtime for safe replacement, in TypeScript, published as the `@molt/*` npm packages. Thesis: _a plugin is a versioned capability provider running inside an owned resource scope; a replacement is prepared in isolation, committed only after successful preparation, and followed by disposal of the previous generation._
 
-Status: **`@molt/runtime` implemented, not yet packaged.** All 11 core modules exist (`packages/runtime-core/src/`), 137 unit tests green including the nine transaction gates T-R1…T-R9, and gates G1–G6 pass locally. Remaining P1 work: property/stress suites (E7/E8), packaging (E10), API review (E11), README (E12). No build output, API-review file, or release exists yet. Check the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before assuming anything is built.
+Status: **`@molt/runtime` implemented and packaged; the new property/stress suites are written but not yet executed.** All 11 core modules exist, 137 unit tests were green at last run (property/stress suites landed 2026-08-31 and await their first run), the dual ESM/CJS build emits `dist/` with publint/attw green, and the reviewed API file exists (`packages/runtime-core/etc/api/runtime.api.md`). Remaining P1 items: run E7/E8, CI matrix (E9), and the P0-A1 push. Check the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before assuming anything is built.
 
 ## Authority chain — read in this order
 
@@ -30,7 +30,7 @@ pnpm check:api                # api-extractor diff vs reviewed API files
 pnpm bench                    # comparison demo (naive registry vs Cordis vs Molt)
 ```
 
-Until P1-E10 (packaging) lands, `build`, `check:pkg`, and `check:api` fail — that is expected; those ledger items create them. `test:property` and `test:stress` run vacuously until P1-E7/E8 add their suites.
+`build`, `check:pkg`, and `check:api` work now. `test:property` and `test:stress` have suites since P1-E7/E8; their first execution is the deferred run/debug session — see the ledger before relying on a green run.
 
 ## Code style — the short list
 
