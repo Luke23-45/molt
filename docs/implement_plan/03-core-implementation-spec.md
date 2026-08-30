@@ -277,6 +277,27 @@ class StagedContributions {
 - Staging after setup resolves but before commit (async setup tail) → allowed and included in commit; staging after commit → `INVALID_STATE`.
 - Same id staged for two different `ContributionKey`s in one generation → `INVALID_DEFINITION` (ids, not key objects, are the namespace — consistent with ADR-05).
 
+### Committed snapshot reads (amendment — forced by the P0-B contract tests)
+
+Hosts must be able to observe what is committed without touching internals; without this read side, the INV-06 visibility contract of T-R3 is untestable through the public API. The runtime therefore exposes:
+
+```ts
+export interface ContributionEntry {
+  readonly generationId: string;
+  readonly pluginId: string;
+  readonly value: unknown;
+}
+
+export interface ContributionSnapshot {
+  readonly entries: ReadonlyMap<string, readonly ContributionEntry[]>;
+}
+
+// on Runtime:
+contributions(): ContributionSnapshot;
+```
+
+The snapshot is frozen at call time; entries are keyed by contribution id and ordered by commit time within a generation. Staged entries never appear (INV-06). Withdrawn generations disappear from the snapshot when their replacement commits.
+
 ---
 
 ## 7. `runtime.ts`
@@ -389,7 +410,7 @@ isMoltError;
 Runtime, RuntimeOptions, RuntimeListener, RuntimeInspection,
 PluginDefinition, PluginContext, PluginStatus,
 Capability, Requirement, ProvidedCapability,
-ContributionKey, ContributionSnapshot, DiagnosticInput,
+ContributionKey, ContributionSnapshot, ContributionEntry, DiagnosticInput,
 Scope, DisposableLike, DisposalReport, RuntimeErrorCode
 ```
 

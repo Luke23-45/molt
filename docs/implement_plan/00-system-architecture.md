@@ -150,7 +150,8 @@ replace(definition):                       // same plugin id only (note 02)
   candidate = prepare in a private scope    // old stays authoritative (INV-07)
   candidate fails → dispose candidate, keep old, throw REPLACEMENT_FAILED
   candidate ok   → commit candidate → publish → mark active
-                → dispose old scope asynchronously
+                → dispose old scope; the protocol resolves only after the
+                  old-scope disposal attempt completes
                     → disposal failure: record DISPOSAL_FAILED diagnostic,
                       do NOT restore old (INV-08, INV-14)
 ```
@@ -244,6 +245,7 @@ The plan must not silently diverge from the notes. These amendments are applied 
 2. **note 02** — record ADR-05: capability resolution is keyed by token `id`; type identity is a compile-time concern only.
 3. **note 04** — record the deterministic multi-provider ordering (host providers first, then plugin id lexicographic).
 4. **note 03** — record the chosen busy policy (queue-and-wait, ADR-10).
+5. **note 02** — `Runtime` gains `contributions(): ContributionSnapshot` and the `ContributionSnapshot`/`ContributionEntry` types are added to the public surface (recorded in [03 §6](./03-core-implementation-spec.md); forced by the P0-B contract tests — without a committed-snapshot read side, the INV-06 visibility claim of T-R3 is not expressible through the public API). The replacement protocol additionally resolves only after the old-scope disposal attempt completes, so INV-14's diagnostic is deterministically inspectable (T-R4) and no disposer rejection is ever floating (T-R8).
 
 ## 10. Explicitly deferred (with the phase that may revisit)
 

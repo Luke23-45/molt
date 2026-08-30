@@ -28,19 +28,19 @@ The single live task tracker for the whole build. Every deliverable from [00–0
 
 ### B. Replacement contract tests — written first, against nothing (they must fail)
 
-- [ ] **P0-B1** `packages/runtime-core/test/replacement.test.ts` scaffolded with fake resources and counters; every test asserts its `MoltError` code, not just "throws" — [03 §7](./03-core-implementation-spec.md), [04 §2](./04-test-plan.md)
-- [ ] **P0-B2** **T-R1** setup throws after acquiring three resources → all three disposed (INV-01)
-- [ ] **P0-B3** **T-R2** candidate replacement throws → old generation active *and usable* during the failed window (INV-07)
-- [ ] **P0-B4** **T-R3** candidate validation fails → zero candidate capabilities/contributions visible (INV-06)
-- [ ] **P0-B5** **T-R4** old disposal fails after commit → new generation active, `DISPOSAL_FAILED` inspectable, no restore (INV-08, INV-14)
-- [ ] **P0-B6** **T-R5** 100 replacements → resource counters at baseline (INV-12)
-- [ ] **P0-B7** **T-R6** dependent stop without cascade → rejected, zero state change (INV-11)
-- [ ] **P0-B8** **T-R7** provider stop with cascade → dependents first, deterministic order (INV-11)
-- [ ] **P0-B9** **T-R8** runtime disposal twice → no duplicate disposer calls, no unhandled rejection (INV-05)
-- [ ] **P0-B10** **T-R9** provider replacement with active dependents → rejected with dependent path, zero state change (INV-15)
-- [ ] **P0-B11** Commit-ordering test (publish → active → old disposed, by event sequence) + interrupted-`preparing` test (INV-06) — [04 §2 replacement extras](./04-test-plan.md)
+- [x] **P0-B1** `packages/runtime-core/test/replacement.test.ts` scaffolded with fake resources and counters; every test asserts its `MoltError` code, not just "throws" — [03 §7](./03-core-implementation-spec.md), [04 §2](./04-test-plan.md) (red by design; typed against the P0 contract declaration `src/index.d.ts`, which is types-only and is deleted at P1-D11)
+- [x] **P0-B2** **T-R1** setup throws after acquiring three resources → all three disposed (INV-01) (red by design)
+- [x] **P0-B3** **T-R2** candidate replacement throws → old generation active *and usable* during the failed window (INV-07) (red by design)
+- [x] **P0-B4** **T-R3** candidate validation fails → zero candidate capabilities/contributions visible (INV-06) (red by design; forced the `contributions()` amendment)
+- [x] **P0-B5** **T-R4** old disposal fails after commit → new generation active, `DISPOSAL_FAILED` inspectable, no restore (INV-08, INV-14) (red by design; forced the disposal-await amendment)
+- [x] **P0-B6** **T-R5** 100 replacements → resource counters at baseline (INV-12) (red by design)
+- [x] **P0-B7** **T-R6** dependent stop without cascade → rejected, zero state change (INV-11) (red by design)
+- [x] **P0-B8** **T-R7** provider stop with cascade → dependents first, deterministic order (INV-11) (red by design)
+- [x] **P0-B9** **T-R8** runtime disposal twice → no duplicate disposer calls, no unhandled rejection (INV-05) (red by design)
+- [x] **P0-B10** **T-R9** provider replacement with active dependents → rejected with dependent path, zero state change (INV-15) (red by design)
+- [x] **P0-B11** Commit-ordering test (publish → active → old disposed, by event sequence) + interrupted-`preparing` test (INV-06) (red by design) — [04 §2 replacement extras](./04-test-plan.md)
 
-**Exit gate P0:** T-R1…T-R9 exist, fail against a stub runtime, and encode INV-01/06/07/11 — note [07 Phase 0](../notes/07-implementation-roadmap.md).
+**Exit gate P0:** T-R1…T-R9 exist, fail against a stub runtime, and encode INV-01/06/07/11 — note [07 Phase 0](../notes/07-implementation-roadmap.md). **Met** (2026-08-30): 11 contract tests exist and fail at import — the runtime does not exist yet; typecheck, lint, and architecture gates are green because the tests are typed against the contract declaration.
 
 ## P1 — `runtime-core` (`@molt/runtime`)
 
@@ -63,7 +63,7 @@ The single live task tracker for the whole build. Every deliverable from [00–0
 - [ ] **P1-D8** `resolver.ts` — selection, ranges, cycles with full path, deterministic order, reverse edges, `BlockedDiagnostic` ([03 §5](./03-core-implementation-spec.md))
 - [ ] **P1-D9** `inspection.ts` — frozen snapshots, blocked-plugin tree renderer ([03 §8](./03-core-implementation-spec.md))
 - [ ] **P1-D10** `runtime.ts` — lifecycle engine: transition table, activation (9 steps), replacement protocol, stop/cascade, uninstall, runtime disposal, observer bus ([03 §7](./03-core-implementation-spec.md))
-- [ ] **P1-D11** `index.ts` — exact public surface of [03 §10](./03-core-implementation-spec.md); JSDoc + `@throws` on every export (ground rule 2)
+- [ ] **P1-D11** `index.ts` — exact public surface of [03 §10](./03-core-implementation-spec.md); JSDoc + `@throws` on every export (ground rule 2); replaces and deletes `src/index.d.ts` (the P0 contract declaration)
 
 ### E. Core test files — every case enumerated in [04 §2](./04-test-plan.md)
 
@@ -162,3 +162,4 @@ _(P0-A9: fill this table at bootstrap; every entry pinned in the root `package.j
 | 2026-08-30 | — | Ledger created; design notes and implementation plan complete; runtime decision recorded (ADR-13: Node ≥22 target, Bun smoke-verified). |
 | 2026-08-30 | P0 | Bootstrap P0-A2…A9 complete and verified: `pnpm verify` green (typecheck + type-checked lint + knip), 3 rig smoke tests green, `pnpm test --coverage` green (thresholds wired; vacuous pass on empty `src/`, strict from P1), `pnpm check:arch` green (0 violations), all JSON/YAML validated. Deviations, all mirrored into the plan in the same change: Vitest 4 removed `vitest.workspace.ts` → projects live in the root `vitest.config.ts` (01/02/04 amended); TypeScript pinned to 5.9.3 because typescript-eslint's peer range requires `<6.1.0`; the runtime-core package skeleton (manifest, tsconfig, vitest config, smoke test) was created early as the rig's verification target — its P1 items remain open; `build`/`api-extract` scripts enter with tsdown/api-extractor at P1-E10/E11; CI stages awaiting their enabling items run `continue-on-error` with in-file markers. |
 | 2026-08-30 | P0 | P0-A1 open: GitHub organization `moltjs`, repository creation, first push, and branch protection require the owner's browser (no `gh` CLI in this environment). Local repository is fully staged for that push. |
+| 2026-08-30 | P0 | P0-B complete: 11 replacement-contract tests written before any runtime exists; they fail at import (designed red — plan 04 §7) while typecheck, lint, and architecture gates stay green, because the tests are typed against `src/index.d.ts`, a types-only transcription of plan 03 (deleted at P1-D11). Two spec gaps surfaced exactly as the Phase 0 stop condition intends, and were amended into the plan in the same change: (1) `Runtime.contributions(): ContributionSnapshot` gives hosts a committed-snapshot read side, without which T-R3's INV-06 visibility claim is unexpressible; (2) the replacement protocol resolves only after the old-scope disposal attempt completes, making INV-14's diagnostic deterministically inspectable (T-R4) and guaranteeing no floating disposer rejection (T-R8). |
