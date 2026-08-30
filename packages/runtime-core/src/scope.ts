@@ -7,9 +7,31 @@ import type { DisposalReport } from './errors.js';
 import { MoltError } from './errors.js';
 import { idempotent } from './internal/async.js';
 
+/**
+ * The ownership scope every generation runs inside (plan 03 §4): disposal
+ * runs LIFO (INV-02), continues after an individual disposer fails with all
+ * failures collected (INV-03), and commits at most once (INV-04). A resource
+ * whose `create` settles after abort is disposed immediately and `acquire`
+ * rejects — nothing stays owned by a dead scope (INV-01/12).
+ *
+ * @public
+ */
 export interface Scope {
+  /** Aborted before the disposers run; long-running setup watches this. */
   readonly signal: AbortSignal;
+  /**
+   * Registers a disposer to run at scope disposal.
+   *
+   * @throws `INVALID_STATE` when the scope is already disposed.
+   */
   onDispose(disposer: () => void | Promise<void>): void;
+  /**
+   * Acquires a resource owned by this scope: the disposer runs LIFO at
+   * disposal, exactly once (INV-05).
+   *
+   * @throws `INVALID_STATE` when the scope is already disposed, or when the
+   * scope aborts while `create` is pending (with the abort cause).
+   */
   acquire<T>(create: () => T | Promise<T>, dispose: (value: T) => void | Promise<void>): Promise<T>;
   isDisposed(): boolean;
   [Symbol.asyncDispose](): Promise<void>;

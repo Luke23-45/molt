@@ -2,6 +2,17 @@
 // throws across its public API; foreign throwables enter the cause chain via
 // MoltError.from — a log line is not an API (note 02).
 
+/**
+ * The fixed set of structured error codes (plan 03 §0): resolution failures
+ * (`MISSING_CAPABILITY`, `INCOMPATIBLE_CAPABILITY`, `AMBIGUOUS_PROVIDER`,
+ * `DEPENDENCY_CYCLE`), identity and definition failures (`DUPLICATE_PLUGIN`,
+ * `INVALID_DEFINITION`), lifecycle failures (`ACTIVE_DEPENDENTS`,
+ * `ACTIVATION_FAILED`, `DISPOSAL_FAILED`, `REPLACEMENT_FAILED`), and state
+ * misuse (`INVALID_STATE`). Codes are part of the API contract — tests and
+ * hosts match on them, never on message text (INV-10).
+ *
+ * @public
+ */
 export type RuntimeErrorCode =
   | 'DUPLICATE_PLUGIN'
   | 'INVALID_DEFINITION'
@@ -15,10 +26,24 @@ export type RuntimeErrorCode =
   | 'REPLACEMENT_FAILED'
   | 'INVALID_STATE';
 
+/**
+ * The result of one scope disposal (plan 03 §4): disposal continues after
+ * an individual disposer fails (INV-03), and every failure is collected
+ * here in the order it was encountered.
+ *
+ * @public
+ */
 export interface DisposalReport {
   readonly errors: readonly unknown[];
 }
 
+/**
+ * The structured identity fields of a `MoltError` (plan 03 §3). All fields
+ * are optional; whatever the runtime knows about the failing item is filled
+ * in deterministically.
+ *
+ * @public
+ */
 export interface MoltErrorInit {
   readonly code: RuntimeErrorCode;
   readonly message: string;
@@ -48,6 +73,15 @@ function buildMessage(init: MoltErrorInit): string {
   return `[${init.code}] ${init.message}${suffix}`;
 }
 
+/**
+ * The only error type core throws across its public API (note 02). The
+ * message format is deterministic — `[CODE] summary (pluginId: …, …)` —
+ * because hosts match on `code` and `details`, never on text. The brand is
+ * installed via `Symbol.for` so classification holds across realm and VM
+ * boundaries (plan 03 §3).
+ *
+ * @public
+ */
 export class MoltError extends Error {
   readonly code: RuntimeErrorCode;
   readonly pluginId: string | undefined;
@@ -73,6 +107,15 @@ export class MoltError extends Error {
     });
   }
 
+  /**
+   * Wraps an arbitrary thrown value into a `MoltError`, preserving the
+   * original as the `cause`. A `MoltError` passes through unchanged —
+   * structured errors are never re-wrapped (plan 03 §3).
+   *
+   * @param value - The caught throwable.
+   * @param code - The code to assign when wrapping; defaults to
+   * `ACTIVATION_FAILED`.
+   */
   static from(value: unknown, code: RuntimeErrorCode = 'ACTIVATION_FAILED'): MoltError {
     if (isMoltError(value)) {
       return value;
@@ -91,6 +134,12 @@ export class MoltError extends Error {
   }
 }
 
+/**
+ * Classifies a value as a `MoltError` via the `Symbol.for` brand — reliable
+ * across realms and VM contexts where `instanceof` fails (plan 03 §3).
+ *
+ * @public
+ */
 export function isMoltError(value: unknown): value is MoltError {
   return typeof value === 'object' && value !== null && BRAND in value;
 }

@@ -23,6 +23,14 @@ import type { BlockedDiagnostic, HostProvider, ResolutionPlan } from './resolver
 import { resolve } from './resolver.js';
 import { ScopeImpl } from './scope.js';
 
+/**
+ * A frozen snapshot of runtime state (plan 03 §8): plugin statuses with the
+ * blocked-plugin data of note 04, the committed capability bindings (INV-06
+ * — staged state never appears), and the capped diagnostic logs. Mutating
+ * the snapshot cannot affect the runtime.
+ *
+ * @public
+ */
 export interface RuntimeInspection {
   readonly plugins: readonly {
     readonly id: string;
@@ -30,14 +38,37 @@ export interface RuntimeInspection {
     readonly generation?: string;
     readonly error?: unknown;
     readonly blockedBy?: readonly BlockedDiagnostic[];
+    /**
+     * The generation's capped diagnostic log (ADR-08) — what the plugin
+     * passed to `ctx.diagnose`, oldest first. Present only while a
+     * committed generation exists; bounded by capacity, never by history.
+     */
+    readonly diagnostics?: readonly DiagnosticInput[];
   }[];
   readonly capabilities: readonly {
     readonly id: string;
     readonly provider: string;
     readonly version: string;
   }[];
+  /**
+   * Failures thrown by observers, capped (ADR-08). Observer throws never
+   * propagate into lifecycle outcomes (plan 03 §7); they surface here so
+   * hosts can see broken listeners.
+   */
+  readonly observerDiagnostics: readonly {
+    readonly message: string;
+    readonly cause: unknown;
+  }[];
 }
 
+/**
+ * One observer event (note 02). Payloads are frozen snapshots; `cascade`
+ * lists the plugins stopped so far in the current cascade stop, in stop
+ * order. Observer throws never affect lifecycle outcomes (plan 03 §7) —
+ * they are recorded in the capped observer diagnostics.
+ *
+ * @public
+ */
 export type RuntimeListener = (event: {
   readonly type: 'installed' | 'started' | 'stopped' | 'replaced' | 'failed' | 'disposed';
   readonly pluginId?: string | undefined;
@@ -46,6 +77,14 @@ export type RuntimeListener = (event: {
   readonly error?: unknown;
 }) => void;
 
+/**
+ * The lifecycle engine surface (note 02): install, start, stop, replace,
+ * uninstall, inspect, and dispose. All operations serialize per plugin id
+ * (queue-and-wait, ADR-10); every failure is a structured `MoltError`
+ * (INV-10). Runtime instances share nothing (INV-13).
+ *
+ * @public
+ */
 export interface Runtime {
   install(definition: PluginDefinition): void;
   uninstall(id: string): Promise<void>;
@@ -59,6 +98,15 @@ export interface Runtime {
   dispose(): Promise<void>;
 }
 
+/**
+ * Host-side providers supplied at construction (note 04): permanent
+ * single-publisher bindings owned by the host. A plugin providing a
+ * host-claimed single-provider token fails at install
+ * (`AMBIGUOUS_PROVIDER`); multi-provider tokens may coexist with a host
+ * provider — the host's value is served first (note 04 ordering).
+ *
+ * @public
+ */
 export interface RuntimeOptions {
   readonly providers?: readonly {
     readonly capability: Capability<unknown>;
@@ -66,6 +114,17 @@ export interface RuntimeOptions {
   }[];
 }
 
+/**
+ * Creates a runtime instance (note 02): a self-contained plugin runtime
+ * with its own definition table, bindings, and diagnostics — no global
+ * registry exists (INV-13).
+ *
+ * @param options - Host providers and construction-time policy.
+ * @throws `AMBIGUOUS_PROVIDER` when two host providers claim the same
+ * capability id — host misconfiguration fails at construction, not at
+ * runtime (plan 03 §5).
+ * @public
+ */
 export function createRuntime(options?: RuntimeOptions): Runtime {
   return new RuntimeImpl(options);
 }
@@ -85,8 +144,12 @@ interface Generation {
   readonly scope: ScopeImpl;
   /** capabilityId → range, from the definition this generation runs. */
   readonly consumed: { capabilityId: string; range: string }[];
-  /** capabilityId → provider generationId actually resolved during setup. */
-  readonly resolvedProviders: Map<string, string>;
+  /**
+   * capabilityId → generationIds of the providers this generation resolved.
+   * Multi-provider tokens resolve to several providers — every one of them
+   * must be tracked, or INV-11/15 miss dependents.
+   */
+  readonly resolvedProviders: Map<string, Set<string>>;
   /** Published token ids; filled at commit, used by withdrawal. */
   readonly providedTokenIds: string[];
   readonly diagnostics: BoundedLog<DiagnosticInput>;
@@ -231,6 +294,7 @@ class RuntimeImpl implements Runtime {
       generationId: record.generation?.id,
       error: record.error,
       blocked: this.#blockedOf(record),
+      diagnostics: record.generation?.diagnostics.entries(),
     }));
     const capabilities: { id: string; provider: string; version: string }[] = [];
     for (const host of this.#hostProviders.values()) {
@@ -249,7 +313,11 @@ class RuntimeImpl implements Runtime {
         });
       }
     }
-    return buildInspection({ plugins, capabilities });
+    return buildInspection({
+      plugins,
+      capabilities,
+      observerDiagnostics: this.#observerDiagnostics.entries(),
+    });
   }
 
   subscribe(listener: RuntimeListener): () => void {
@@ -442,7 +510,7 @@ class RuntimeImpl implements Runtime {
         capabilityId: requirement.capability.id,
         range: requirement.range,
       })),
-      resolvedProviders: new Map<string, string>(),
+      resolvedProviders: new Map<string, Set<string>>(),
       providedTokenIds: [],
       diagnostics: new BoundedLog<DiagnosticInput>(DIAGNOSTIC_CAPACITY),
     };
@@ -474,8 +542,13 @@ class RuntimeImpl implements Runtime {
           });
         }
       }
-      // 7: conflicts — nothing may collide with unrelated active generations.
-      for (const tokenId of stagedProvides.keys()) {
+      // 7: conflicts — a single-provider token may collide with no unrelated
+      // active generation; multi-provider tokens coexist by design (note 04
+      // aggregation, mirrored by the install-time host guard).
+      for (const [tokenId, binding] of stagedProvides) {
+        if (binding.capability.multiple) {
+          continue;
+        }
         const byGeneration = this.#published.get(tokenId);
         if (byGeneration !== undefined && byGeneration.size > 0) {
           throw new MoltError({
@@ -604,7 +677,7 @@ class RuntimeImpl implements Runtime {
         capabilityId: requirement.capability.id,
         range: requirement.range,
       })),
-      resolvedProviders: new Map<string, string>(),
+      resolvedProviders: new Map<string, Set<string>>(),
       providedTokenIds: [],
       diagnostics: new BoundedLog<DiagnosticInput>(DIAGNOSTIC_CAPACITY),
     };
@@ -629,9 +702,13 @@ class RuntimeImpl implements Runtime {
           });
         }
       }
-      // Step 7: the candidate may shadow the generation it replaces —
-      // nothing else (plan 00 §4.2 step 7).
-      for (const tokenId of stagedProvides.keys()) {
+      // Step 7: the candidate may shadow the generation it replaces — and,
+      // for multi-provider tokens, coexist with other active providers
+      // (note 04); nothing else passes.
+      for (const [tokenId, binding] of stagedProvides) {
+        if (binding.capability.multiple) {
+          continue;
+        }
         const byGeneration = this.#published.get(tokenId);
         if (byGeneration === undefined) {
           continue;
@@ -786,7 +863,9 @@ class RuntimeImpl implements Runtime {
         type: 'stopped',
         pluginId: target.pluginId,
         generation: target.id,
-        cascade: cascade && closure.length > 1 ? stoppedIds : undefined,
+        // A frozen copy per event: sharing the growing array would let a
+        // later step mutate earlier listeners' snapshots (note 03).
+        cascade: cascade && closure.length > 1 ? Object.freeze([...stoppedIds]) : undefined,
       });
     }
   }
@@ -941,12 +1020,25 @@ class RuntimeImpl implements Runtime {
         }
         for (const [providerGenerationId, binding] of byGeneration) {
           if (binding.pluginId === selection.pluginId) {
-            generation.resolvedProviders.set(capabilityId, providerGenerationId);
+            this.#recordProviderEdge(generation, capabilityId, providerGenerationId);
             break;
           }
         }
       }
     }
+  }
+
+  #recordProviderEdge(
+    generation: Generation,
+    capabilityId: string,
+    providerGenerationId: string,
+  ): void {
+    const providers = generation.resolvedProviders.get(capabilityId);
+    if (providers === undefined) {
+      generation.resolvedProviders.set(capabilityId, new Set([providerGenerationId]));
+      return;
+    }
+    providers.add(providerGenerationId);
   }
 
   #currentSelections(capabilityId: string): readonly { pluginId: string | null }[] {
@@ -1070,7 +1162,7 @@ class RuntimeImpl implements Runtime {
     if (byGeneration !== undefined) {
       for (const [providerGenerationId, binding] of byGeneration) {
         if (binding.pluginId === pluginId) {
-          generation.resolvedProviders.set(capabilityId, providerGenerationId);
+          this.#recordProviderEdge(generation, capabilityId, providerGenerationId);
           return { value: binding.value, generationId: providerGenerationId };
         }
       }
@@ -1096,8 +1188,8 @@ class RuntimeImpl implements Runtime {
       ) {
         continue;
       }
-      for (const providerGenerationId of generation.resolvedProviders.values()) {
-        if (providerGenerationId === provider.id) {
+      for (const providers of generation.resolvedProviders.values()) {
+        if (providers.has(provider.id)) {
           dependents.push(generation);
           break;
         }

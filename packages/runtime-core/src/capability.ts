@@ -14,6 +14,15 @@ export function isValidRuntimeId(id: string): boolean {
   return typeof id === 'string' && ID_PATTERN.test(id);
 }
 
+/**
+ * A capability token: the named, versioned unit of provision that plugins
+ * declare and resolve (note 04). Tokens resolve by id — never by object
+ * identity (ADR-05) — and carry the provider policy: `multiple: true`
+ * tokens aggregate every selected provider's array; `multiple: false`
+ * tokens accept exactly one publisher.
+ *
+ * @public
+ */
 export interface Capability<T> {
   readonly id: string;
   readonly version: string;
@@ -22,6 +31,17 @@ export interface Capability<T> {
   readonly __type?: T;
 }
 
+/**
+ * Mints a frozen capability token. The id must satisfy the runtime id
+ * grammar (dotted, lowercase); the version must be a valid semver version.
+ *
+ * @param id - Capability id, e.g. `storage.connection`.
+ * @param version - Semver version of the capability contract.
+ * @param options - `multiple: true` declares a multi-provider token.
+ * @throws `INVALID_DEFINITION` when the id or version fails its grammar, or
+ * when `multiple` is present but not a boolean.
+ * @public
+ */
 export function capability<T>(
   id: string,
   version: string,

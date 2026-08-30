@@ -5,12 +5,26 @@
 import { isValidRuntimeId } from './capability.js';
 import { MoltError } from './errors.js';
 
+/**
+ * A contribution key: the named channel plugins contribute values to
+ * (note 05). Keys resolve by id (ADR-05); two keys sharing an id collide
+ * inside one generation.
+ *
+ * @public
+ */
 export interface ContributionKey<T> {
   readonly id: string;
   /** Type phantom — never present at runtime, never read. */
   readonly __type?: T;
 }
 
+/**
+ * Mints a frozen contribution key.
+ *
+ * @param id - Contribution key id, e.g. `ui.toolbar`.
+ * @throws `INVALID_DEFINITION` when the id fails the runtime id grammar.
+ * @public
+ */
 export function contributionKey<T>(id: string): ContributionKey<T> {
   if (!isValidRuntimeId(id)) {
     throw new MoltError({
@@ -22,12 +36,26 @@ export function contributionKey<T>(id: string): ContributionKey<T> {
   return Object.freeze<ContributionKey<T>>({ id });
 }
 
+/**
+ * One committed contribution: who owns it (generation and plugin) and the
+ * opaque value the plugin staged. Values are never inspected by core
+ * (note 02).
+ *
+ * @public
+ */
 export interface ContributionEntry {
   readonly generationId: string;
   readonly pluginId: string;
   readonly value: unknown;
 }
 
+/**
+ * The committed contribution snapshot read side (`Runtime.contributions()`,
+ * plan 00 §9 amendment 5). Only committed generations appear (INV-06);
+ * entries are frozen and sorted by generation commit order.
+ *
+ * @public
+ */
 export interface ContributionSnapshot {
   readonly entries: ReadonlyMap<string, readonly ContributionEntry[]>;
 }

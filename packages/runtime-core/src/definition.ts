@@ -10,26 +10,69 @@ import { MoltError } from './errors.js';
 import { isValidRange, isValidVersion } from './internal/semver.js';
 import type { Scope } from './scope.js';
 
+/**
+ * The cleanup contract a plugin may return from `setup` (note 02): adopted
+ * by the generation's scope and run exactly once during disposal (INV-05).
+ * `dispose` never throws into the lifecycle — a throw is collected in the
+ * disposal report (INV-03).
+ *
+ * @public
+ */
 export interface DisposableLike {
   dispose: () => void | Promise<void>;
 }
 
+/**
+ * Plugin lifecycle status (note 02). `installed → preparing → active →
+ * disposing → stopped`; a failed preparation exits to `stopped`. Observed
+ * through `Runtime.getStatus` and `Runtime.inspect`.
+ *
+ * @public
+ */
 export type PluginStatus = 'installed' | 'preparing' | 'active' | 'disposing' | 'stopped';
 
+/**
+ * One declared dependency: a capability token plus the semver range the
+ * consumer accepts. `optional: true` requirements resolve to `undefined`
+ * when nothing selectable exists instead of failing the start (note 04).
+ *
+ * @public
+ */
 export interface Requirement {
   readonly capability: Capability<unknown>;
   readonly range: string;
   readonly optional?: boolean | undefined;
 }
 
+/**
+ * One declared provision: a capability token this plugin publishes during
+ * `setup`. `multiple` must agree with the token's own provider policy —
+ * the token is the authority (plan 03 §1).
+ *
+ * @public
+ */
 export interface ProvidedCapability {
   readonly capability: Capability<unknown>;
   readonly multiple?: boolean | undefined;
 }
 
+/**
+ * The per-activation object handed to `setup` (note 02). Everything a
+ * plugin touches flows through here — there are no globals (INV-13). The
+ * context is live only for this generation; its scope is disposed when the
+ * generation stops, is replaced, or fails (INV-01/12).
+ *
+ * @throws Methods throw structured `MoltError`s: `require`/`optional` for
+ * undeclared tokens (`INVALID_STATE`, `details.reason =
+ * 'undeclared-requirement'` — INV-09), `provide` for undeclared or
+ * duplicated tokens (`ACTIVATION_FAILED`), `contribute` for duplicate ids
+ * (`INVALID_DEFINITION`) or post-commit staging (`INVALID_STATE`).
+ * @public
+ */
 export interface PluginContext {
   readonly pluginId: string;
   readonly generation: string;
+  /** Aborted before the generation's disposers run (plan 03 §4). */
   readonly signal: AbortSignal;
   readonly scope: Scope;
   require<T>(capability: Capability<T>): T;
@@ -39,12 +82,25 @@ export interface PluginContext {
   diagnose(message: DiagnosticInput): void;
 }
 
+/**
+ * One diagnostic entry (note 02). Diagnostics are recorded in the
+ * generation's capped log (ADR-08) and are visible through `inspect()` —
+ * they never replace structured errors (INV-10).
+ *
+ * @public
+ */
 export interface DiagnosticInput {
   readonly message: string;
   readonly severity?: 'info' | 'warning' | 'error' | undefined;
   readonly details?: Readonly<Record<string, unknown>> | undefined;
 }
 
+/**
+ * The immutable description of a plugin (note 02). Validated at
+ * `install`/`replace` and frozen (ADR-06) — setup must never mutate it.
+ *
+ * @public
+ */
 export interface PluginDefinition {
   readonly id: string;
   readonly version: string;

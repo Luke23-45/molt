@@ -363,17 +363,21 @@ Per [00 §4.4](./00-system-architecture.md). `uninstall` rules (note 04): active
 
 ## 8. `inspection.ts`
 
-### Public API (finalized — note 02 shape, extended for blocked plugins)
+### Public API (finalized — note 02 shape, extended for blocked plugins and diagnostics)
 
 ```ts
 export interface RuntimeInspection {
   readonly plugins: readonly {
     id: string; status: PluginStatus; generation?: string; error?: unknown;
     blockedBy?: readonly BlockedDiagnostic;   // present iff start failed on resolution
+    diagnostics?: readonly DiagnosticInput[]; // generation's capped log (ADR-08), iff committed
   }[];
   readonly capabilities: readonly {
     id: string; provider: string; version: string;
   }[];
+  readonly observerDiagnostics: readonly {
+    message: string; cause: unknown;
+  }[];                                        // capped listener-throw log (ADR-08)
 }
 ```
 
@@ -382,6 +386,10 @@ export interface RuntimeInspection {
 - `inspect()` returns a fresh frozen snapshot; mutating it cannot affect the runtime (note 03: immutable snapshots).
 - The blocked-plugin tree of note 04 (`example.consumer cannot start └─ requires storage >= 2.0.0 …`) is a *renderer* over `BlockedDiagnostic`; the renderer lives in inspection, the data lives in the resolver — the diagnostic contract is data, not text.
 - `capabilities` lists committed generations and host providers only (INV-06); staged entries never appear.
+
+### Diagnostics visibility (amendment — forced by the stress suite)
+
+ADR-08 caps the diagnostic logs, but a cap nobody can observe is unverifiable: plan [04 §4](./04-test-plan.md) asserts bounded memory through the ring-buffer caps, and molt-testing forbids asserting on private state. `inspect()` therefore surfaces both capped logs — `plugins[].diagnostics` (what the plugin passed to `ctx.diagnose`, present while a committed generation exists) and `observerDiagnostics` (listener throws, which never propagate into lifecycle outcomes). Both are bounded by capacity (100 entries, ADR-08), never by history.
 
 ### Edge cases
 
