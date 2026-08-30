@@ -4,9 +4,9 @@ Instructions for AI coding agents working in this repository. Followed by Codex,
 
 ## Project overview
 
-**Molt** is a general plugin runtime for safe replacement, in TypeScript, published as the `@molt/*` npm packages. Thesis: *a plugin is a versioned capability provider running inside an owned resource scope; a replacement is prepared in isolation, committed only after successful preparation, and followed by disposal of the previous generation.*
+**Molt** is a general plugin runtime for safe replacement, in TypeScript, published as the `@molt/*` npm packages. Thesis: _a plugin is a versioned capability provider running inside an owned resource scope; a replacement is prepared in isolation, committed only after successful preparation, and followed by disposal of the previous generation._
 
-Status: **pre-implementation.** The design notes (`docs/notes/`) and the engineering plan (`docs/implement_plan/`) are complete; no source code exists yet. Check the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before assuming anything is built.
+Status: **`@molt/runtime` implemented, not yet packaged.** All 11 core modules exist (`packages/runtime-core/src/`), 137 unit tests green including the nine transaction gates T-R1…T-R9, and gates G1–G6 pass locally. Remaining P1 work: property/stress suites (E7/E8), packaging (E10), API review (E11), README (E12). No build output, API-review file, or release exists yet. Check the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before assuming anything is built.
 
 ## Authority chain — read in this order
 
@@ -30,7 +30,7 @@ pnpm check:api                # api-extractor diff vs reviewed API files
 pnpm bench                    # comparison demo (naive registry vs Cordis vs Molt)
 ```
 
-Until P0 bootstrap lands, these commands will fail — that is expected; the first ledger tasks create them.
+Until P1-E10 (packaging) lands, `build`, `check:pkg`, and `check:api` fail — that is expected; those ledger items create them. `test:property` and `test:stress` run vacuously until P1-E7/E8 add their suites.
 
 ## Code style — the short list
 
@@ -55,13 +55,13 @@ Every PR states three things: what changed, which invariants (INV-xx) it touches
 
 Task-specific playbooks live in [`.agents/skills/`](./.agents/README.md) (Agent Skills format, [agentskills.io](https://agentskills.io/specification)):
 
-| Skill | Load when |
-|---|---|
-| `molt-orientation` | Starting any work in this repo — the map and the authority chain |
-| `molt-coding-standards` | Writing or reviewing any TypeScript in the packages |
+| Skill                      | Load when                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| `molt-orientation`         | Starting any work in this repo — the map and the authority chain                 |
+| `molt-coding-standards`    | Writing or reviewing any TypeScript in the packages                              |
 | `molt-lifecycle-semantics` | Touching `runtime-core` source — invariants, state machine, replacement protocol |
-| `molt-testing` | Writing, changing, or reviewing tests |
-| `molt-workflow` | Completing ledger tasks or opening PRs |
-| `molt-packaging` | Changing `package.json`, exports, the public API surface, or releasing |
+| `molt-testing`             | Writing, changing, or reviewing tests                                            |
+| `molt-workflow`            | Completing ledger tasks or opening PRs                                           |
+| `molt-packaging`           | Changing `package.json`, exports, the public API surface, or releasing           |
 
 Nested `AGENTS.md` files inside `packages/*` may be added as packages are created; the nearest file to an edited source wins.

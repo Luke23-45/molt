@@ -4,7 +4,7 @@ description: Orients any agent in the Molt repository — what the project is, w
 license: MIT
 metadata:
   author: moltjs
-  version: "1.0"
+  version: '1.0'
 ---
 
 # Molt orientation
@@ -38,7 +38,7 @@ demo/comparison/           # three-way demo: naive registry vs Cordis vs Molt (P
 
 ## Status check — always do this first
 
-Read the progress log at the bottom of `docs/implement_plan/ledger.md` and the first unchecked item. As of the ledger's creation, **no source code exists** — the repo is documentation-only and the next work is P0 (bootstrap + the failing transaction tests). Never assume a package, script, or gate exists without a checked ledger item saying so.
+Read the progress log at the bottom of `docs/implement_plan/ledger.md` and the first unchecked item. Never assume a package, script, or gate exists without a checked ledger item saying so. As of the P1 core work (2026-08-30): all `runtime-core` modules exist and 137 unit tests pass, but the property/stress suites (P1-E7/E8), packaging (E10), API review (E11), and root README (E12) are still open — no build output or release exists yet.
 
 ## Non-negotiables (full lists in the referenced docs)
 
@@ -49,10 +49,10 @@ Read the progress log at the bottom of `docs/implement_plan/ledger.md` and the f
 
 ## Where to look things up
 
-| Question | Document |
-|---|---|
-| Why does this library exist; who is the competition | `docs/notes/01`, `docs/notes/08` |
-| What does the public API look like | `docs/notes/02`, finalized in `docs/implement_plan/03` |
-| How must replacement/disposal behave | `docs/notes/03`, algorithms in `docs/implement_plan/00` §4 |
-| What tests must exist | `docs/implement_plan/04` |
-| What am I supposed to do next | first unchecked item in `docs/implement_plan/ledger.md` |
+| Question                                            | Document                                                   |
+| --------------------------------------------------- | ---------------------------------------------------------- |
+| Why does this library exist; who is the competition | `docs/notes/01`, `docs/notes/08`                           |
+| What does the public API look like                  | `docs/notes/02`, finalized in `docs/implement_plan/03`     |
+| How must replacement/disposal behave                | `docs/notes/03`, algorithms in `docs/implement_plan/00` §4 |
+| What tests must exist                               | `docs/implement_plan/04`                                   |
+| What am I supposed to do next                       | first unchecked item in `docs/implement_plan/ledger.md`    |

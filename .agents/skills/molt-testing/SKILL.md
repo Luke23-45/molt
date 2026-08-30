@@ -4,7 +4,7 @@ description: How tests are written in the Molt repository — invariant-named te
 license: MIT
 metadata:
   author: moltjs
-  version: "1.0"
+  version: '1.0'
 ---
 
 # Molt testing rules
@@ -15,23 +15,23 @@ Full source: `docs/implement_plan/04-test-plan.md`. The suite is designed around
 
 - Every test name cites what it proves: `it('INV-07: failed candidate replacement leaves the old generation serving', …)`. A test without an INV or spec-section reference is rejected in review.
 - Test files mirror source files one-to-one (`scope.test.ts`, `resolver.test.ts`, `runtime.test.ts`, `inspection.test.ts`, `errors.test.ts`, `capability.test.ts`, `contributions.test.ts`, plus `internal/async.test.ts`). `replacement.test.ts` holds the transaction gates.
-- Vitest workspace projects: `unit` (node + happy-dom), `property` (fast-check), `stress`. Run with `pnpm test`, `pnpm test:property`, `pnpm test:stress`.
+- Vitest projects defined in the root `vitest.config.ts` (Vitest 4 removed `vitest.workspace.ts`): `unit` (node + happy-dom), `property` (fast-check), `stress`. Run with `pnpm test`, `pnpm test:property`, `pnpm test:stress`.
 
 ## The transaction gates — release blockers (note 06)
 
 Written in P0 **before** the implementation existed; they must fail against a stub runtime and stay green forever:
 
-| ID | Assertion |
-|---|---|
-| T-R1 | setup throws after acquiring three resources → all three disposed (INV-01) |
-| T-R2 | candidate replacement throws → old generation active **and usable** during the failed window (INV-07) |
-| T-R3 | candidate validation fails → zero candidate capabilities/contributions visible (INV-06) |
+| ID   | Assertion                                                                                                      |
+| ---- | -------------------------------------------------------------------------------------------------------------- |
+| T-R1 | setup throws after acquiring three resources → all three disposed (INV-01)                                     |
+| T-R2 | candidate replacement throws → old generation active **and usable** during the failed window (INV-07)          |
+| T-R3 | candidate validation fails → zero candidate capabilities/contributions visible (INV-06)                        |
 | T-R4 | old disposal fails after commit → new generation active, `DISPOSAL_FAILED` inspectable, no restore (INV-08/14) |
-| T-R5 | 100 replacements → resource counters at baseline (INV-12) |
-| T-R6 | dependent stop without cascade → rejected, zero state change (INV-11) |
-| T-R7 | provider stop with cascade → dependents first, deterministic order (INV-11) |
-| T-R8 | runtime disposal twice → no duplicate disposer calls, no unhandled rejection (INV-05) |
-| T-R9 | provider replacement with active dependents → rejected with path, zero state change (INV-15) |
+| T-R5 | 100 replacements → resource counters at baseline (INV-12)                                                      |
+| T-R6 | dependent stop without cascade → rejected, zero state change (INV-11)                                          |
+| T-R7 | provider stop with cascade → dependents first, deterministic order (INV-11)                                    |
+| T-R8 | runtime disposal twice → no duplicate disposer calls, no unhandled rejection (INV-05)                          |
+| T-R9 | provider replacement with active dependents → rejected with path, zero state change (INV-15)                   |
 
 Every `@throws` code documented in `docs/implement_plan/03` has ≥1 test asserting the **code**, not just "throws".
 
