@@ -76,13 +76,29 @@ Before release:
 - verify package exports prevent accidental access to internal modules;
 - run a clean install and build from the published tarball.
 
+## Comparison demo
+
+The replacement/leak benchmarks required below are one scripted, three-way comparison. The same scenario runs against three runtimes:
+
+1. a naive registry (register, activate, no ownership);
+2. the current Cordis release, with its version recorded;
+3. Molt.
+
+The scenario: a plugin acquires listeners, timers, and UI contributions, then receives a replacement whose setup fails, followed by one whose setup succeeds. Each run reports:
+
+- whether the old generation kept serving during the failed window;
+- resource counters after repeated replacement;
+- the diagnostic a user sees for a blocked plugin.
+
+The output is a table and a reproduction script. It is the evidence behind the README, and the README links to it. If Molt's row is not visibly better than the naive registry's row, the thesis fails and publication stops.
+
 ## Evidence required for a “publish” decision
 
 Publish only when all of the following exist:
 
 - a working core package;
 - at least two real host adapters or example hosts;
-- reproducible replacement/leak benchmarks;
+- reproducible replacement/leak benchmarks (the comparison demo above);
 - documented limitations;
 - no known lifecycle invariant failures;
 - an example showing why a normal event emitter or simple plugin list is insufficient.

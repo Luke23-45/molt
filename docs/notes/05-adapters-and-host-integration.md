@@ -14,7 +14,7 @@ packages/
   runtime-test/       # fake host capabilities and leak assertions
 ```
 
-The exact package names are not final. The dependency direction is final:
+The exact package names are not final; published names use the `@molt` scope (see [8. Positioning and related work](./08-positioning-and-related-work.md)). The dependency direction is final:
 
 ```text
 host application ─┬─ runtime-react
@@ -22,6 +22,21 @@ host application ─┬─ runtime-react
                   ├─ runtime-sqlite
                   └─ runtime-core
 ```
+
+## Package charters
+
+Every package must state the problem it solves. This is a publication gate, not a slogan: a package that cannot state its problem is kept internal or deleted.
+
+| Package | The problem it solves | Published? |
+|---|---|---|
+| `runtime-core` → `@molt/runtime` | How does a host replace a running plugin and know which runtime resources belong to which generation? | Yes — the only standalone unit. |
+| `runtime-react` → `@molt/react` | Plugin UI unmounts exactly when its generation is disposed, with per-contribution error isolation. | Adapter; publishes with the core. |
+| `runtime-vite` → `@molt/vite` | A failed module update keeps the old generation running instead of half-swapping it. | Adapter; also the headline demo of the replacement protocol. |
+| `runtime-events` → `@molt/events` | Typed event subscriptions that disappear with their generation. | Not standalone: mitt or RxJS solve events alone. Ships only as a demonstration of scoped subscriptions. |
+| `runtime-sqlite` → `@molt/sqlite` | Typed database capability with owner and checksum migration records; stopping a plugin never rolls back applied schema. | Internal first; publishes only when a second consumer exists. |
+| `runtime-test` → `@molt/test` | Fake host resources with leak counters, so replacement and leak invariants are assertable in any host. | Support package; ships with the core, not a product on its own. |
+
+The adapters exist to prove the core, not to be products. If `runtime-core` does not demonstrate stronger failure behavior than a naive registry, no adapter changes that.
 
 ## React adapter
 

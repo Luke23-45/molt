@@ -104,6 +104,8 @@ export interface Scope {
 
 If `setup` returns a `DisposableLike`, the runtime adopts it into the candidate scope before performing any later validation or commit step. A returned disposer is therefore cleaned up when validation fails as well as when normal shutdown occurs.
 
+`DisposableLike` implementations should satisfy the ECMAScript disposable protocol when the host supports it, so resources acquired through the runtime work with `using` and `await using` declarations.
+
 The runtime must reject new acquisitions after scope disposal. Long-running resources should observe `signal` and stop their own work when aborted.
 
 ## Plugin context

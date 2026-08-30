@@ -24,6 +24,8 @@ The interesting unit is not “a plugin registry” or “an event bus.” Those
 - replacement that keeps the old generation active if preparation fails;
 - diagnostics that expose the ownership graph.
 
+Positioning against existing systems is recorded in [8. Positioning and related work](./08-positioning-and-related-work.md).
+
 This is a hypothesis to validate, not a marketing claim. It earns publication only if the implementation demonstrates stronger failure behavior than ordinary plugin registries and works in more than Sky.
 
 ## Guarantees
