@@ -22,7 +22,7 @@ For a single-provider capability:
 - an incompatible provider does not satisfy the requirement;
 - a plugin cannot provide a capability it did not declare.
 
-For a multi-provider capability, the token must declare that policy. Consumers receive a stable ordered collection with documented ordering; map iteration order is not a valid policy.
+For a multi-provider capability, the token must declare that policy. Consumers receive a stable ordered collection with documented ordering; map iteration order is not a valid policy. The documented ordering (plan 00 §9) is: host providers first, then plugin providers by plugin id, lexicographic.
 
 Built-in host capabilities are represented by the same token mechanism as plugin-provided capabilities. “Core” is not a magic string exception.
 

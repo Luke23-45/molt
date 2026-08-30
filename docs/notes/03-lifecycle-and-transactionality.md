@@ -16,7 +16,7 @@ active ── stop ──► disposing ──► stopped
    └──────────────► preparing(candidate)
 ```
 
-The runtime must serialize lifecycle operations for the same plugin ID. A second `start`, `stop`, or `replace` waits for or receives a structured busy error according to the chosen API policy; it must not race the first operation.
+The runtime must serialize lifecycle operations for the same plugin ID. A second `start`, `stop`, or `replace` waits for or receives a structured busy error according to the chosen API policy; it must not race the first operation. The chosen policy (plan 00 ADR-10) is queue-and-wait: a queued operation waits for its turn and re-reads state when it runs, because state may have changed between enqueue and execution.
 
 ## Normal activation
 

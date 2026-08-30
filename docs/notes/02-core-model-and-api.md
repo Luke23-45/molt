@@ -214,7 +214,10 @@ type RuntimeErrorCode =
   | 'ACTIVE_DEPENDENTS'
   | 'ACTIVATION_FAILED'
   | 'DISPOSAL_FAILED'
-  | 'REPLACEMENT_FAILED';
+  | 'REPLACEMENT_FAILED'
+  | 'INVALID_STATE';
 ```
+
+`INVALID_STATE` was added by the implementation plan (00 §9): lifecycle operations on missing or mis-typed states — starting an active plugin, uninstalling an active plugin, replacing an uninstalled id, accessing a disposed scope, observer re-entry — need a structured code of their own. Capability resolution failures keep the resolution codes. Capability resolution is additionally keyed by token `id`, never by token object identity; type identity is a compile-time concern only, so separately bundled copies of the token factory resolve identically (plan 00 ADR-05).
 
 The error should include the plugin ID, generation if applicable, dependency path, capability ID, and original cause. A log line alone is not an API.

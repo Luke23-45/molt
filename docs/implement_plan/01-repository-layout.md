@@ -62,7 +62,7 @@ One base config, extended by packages and tests — the split used by Effect (`b
 {
   "compilerOptions": {
     "target": "es2022",              // native Error.cause, .at(), structured clone-free code
-    "lib": ["es2022"],               // DOM is never in core (gate G6)
+    "lib": ["es2022", "esnext.disposable"], // disposable protocol typed for ADR-09 (TC39 Stage 4); DOM stays excluded
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "declaration": true,
