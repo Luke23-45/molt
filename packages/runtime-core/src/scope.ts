@@ -92,14 +92,11 @@ export class ScopeImpl implements Scope {
     this.#entries = [];
     const errors: unknown[] = [];
     const run = async (): Promise<DisposalReport> => {
-      for (let index = entries.length - 1; index >= 0; index -= 1) {
-        const entry = entries[index];
-        if (entry === undefined) {
-          continue; // unreachable: index bounds are exact; satisfies noUncheckedIndexedAccess
-        }
+      // Reverse iteration over a copy: LIFO (INV-02), no indexed access.
+      for (const entry of [...entries].reverse()) {
         // A failing disposer never prevents later disposers; every failure is
         // collected (INV-03). Async disposers are awaited in sequence, so
-        // teardown order is deterministic (INV-02).
+        // teardown order is deterministic.
         try {
           await entry.run();
         } catch (error) {

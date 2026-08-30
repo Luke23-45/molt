@@ -67,6 +67,23 @@ describe('cause chaining', () => {
     expect(error.message).toContain('a string thrown');
     expect(error.cause).toBe('a string thrown');
   });
+
+  it('MoltError.from renders objects as JSON, never "[object Object]"', () => {
+    const error = MoltError.from({ code: 42 }, 'ACTIVATION_FAILED');
+    expect(error.message).toContain('{"code":42}');
+  });
+
+  it('MoltError.from survives circular objects', () => {
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+    const error = MoltError.from(circular, 'ACTIVATION_FAILED');
+    expect(error.message).toContain('[unserializable throwable]');
+  });
+
+  it('MoltError.from renders primitives without JSON quoting', () => {
+    expect(MoltError.from(42, 'ACTIVATION_FAILED').message).toContain('42');
+    expect(MoltError.from(null, 'ACTIVATION_FAILED').message).toContain('null');
+  });
 });
 
 describe('isMoltError', () => {

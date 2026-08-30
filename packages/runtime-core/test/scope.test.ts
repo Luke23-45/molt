@@ -171,6 +171,24 @@ describe('acquisition boundaries (INV-01, INV-12)', () => {
     expect(disposedWith).toEqual({ id: 1 });
   });
 
+  it('abort during a pending create attaches the disposal failure as cause', async () => {
+    const scope = makeScope();
+    const created = createDeferred<{ id: number }>();
+    const disposalFailure = new Error('dispose raced too');
+    const pending = scope.acquire(
+      () => created.promise,
+      () => {
+        throw disposalFailure;
+      },
+    );
+
+    await scope.dispose();
+    created.resolve({ id: 1 });
+
+    const error = await expectCode(pending, 'INVALID_STATE');
+    expect(error.cause).toBe(disposalFailure);
+  });
+
   it('abort during a pending create that rejects propagates the original error and disposes nothing', async () => {
     const scope = makeScope();
     const created = createDeferred<never>();

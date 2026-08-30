@@ -23,14 +23,12 @@ export function createDeferred<T>(): Deferred<T> {
  * never blocks the next one.
  */
 export class AsyncMutex {
+  // The tail never rejects: failures settle into it via the two-callback
+  // assignment below, so `.then(section)` alone is safe.
   #tail: Promise<void> = Promise.resolve();
 
   runExclusive<T>(section: () => T | Promise<T>): Promise<T> {
-    const settled = this.#tail.then(
-      () => undefined,
-      () => undefined,
-    );
-    const result = settled.then(section);
+    const result = this.#tail.then(section);
     this.#tail = result.then(
       () => undefined,
       () => undefined,

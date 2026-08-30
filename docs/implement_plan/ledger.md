@@ -46,36 +46,36 @@ The single live task tracker for the whole build. Every deliverable from [00–0
 
 ### C. Design-note amendments (land in the same PR as the code that makes them true — [00 §9](./00-system-architecture.md))
 
-- [ ] **P1-C1** Note 02: add `INVALID_STATE` to `RuntimeErrorCode`
-- [ ] **P1-C2** Note 02: record ADR-05 (resolution keyed by token `id`, not identity)
-- [ ] **P1-C3** Note 04: record deterministic multi-provider ordering (host first, then id lexicographic)
-- [ ] **P1-C4** Note 03: record the busy policy (queue-and-wait, ADR-10)
+- [x] **P1-C1** Note 02: add `INVALID_STATE` to `RuntimeErrorCode`
+- [x] **P1-C2** Note 02: record ADR-05 (resolution keyed by token `id`, not identity)
+- [x] **P1-C3** Note 04: record deterministic multi-provider ordering (host first, then id lexicographic)
+- [x] **P1-C4** Note 03: record the busy policy (queue-and-wait, ADR-10)
 
 ### D. Core modules — in dependency order ([00 §1](./00-system-architecture.md), [01 §5](./01-repository-layout.md))
 
-- [ ] **P1-D1** `internal/async.ts` — deferreds, `AsyncMutex`, `OperationQueue`, idempotent wrapper, `BoundedLog` (ADR-08, ADR-10)
-- [ ] **P1-D2** `internal/semver.ts` — the only import of `semver` (ADR-02)
-- [ ] **P1-D3** `errors.ts` — `MoltError`, 11 codes, cause chains, `isMoltError` brand check, `DisposalReport` ([03 §3](./03-core-implementation-spec.md))
-- [ ] **P1-D4** `capability.ts` — token factory, policy field, id/version grammar, frozen output (ADR-05) ([03 §1](./03-core-implementation-spec.md))
-- [ ] **P1-D5** `definition.ts` — types + 8-step validation + deep-shallow freeze (ADR-06) ([03 §2](./03-core-implementation-spec.md))
-- [ ] **P1-D6** `scope.ts` — `Scope`, disposal engine (abort → LIFO → continue-on-error → report), `Symbol.asyncDispose` (ADR-09) ([03 §4](./03-core-implementation-spec.md))
-- [ ] **P1-D7** `contributions.ts` — staged/commit snapshots, shadowing rules ([03 §6](./03-core-implementation-spec.md))
-- [ ] **P1-D8** `resolver.ts` — selection, ranges, cycles with full path, deterministic order, reverse edges, `BlockedDiagnostic` ([03 §5](./03-core-implementation-spec.md))
-- [ ] **P1-D9** `inspection.ts` — frozen snapshots, blocked-plugin tree renderer ([03 §8](./03-core-implementation-spec.md))
-- [ ] **P1-D10** `runtime.ts` — lifecycle engine: transition table, activation (9 steps), replacement protocol, stop/cascade, uninstall, runtime disposal, observer bus ([03 §7](./03-core-implementation-spec.md))
-- [ ] **P1-D11** `index.ts` — exact public surface of [03 §10](./03-core-implementation-spec.md); JSDoc + `@throws` on every export (ground rule 2); replaces and deletes `src/index.d.ts` (the P0 contract declaration)
+- [x] **P1-D1** `internal/async.ts` — deferreds, `AsyncMutex`, `OperationQueue`, idempotent wrapper, `BoundedLog` (ADR-08, ADR-10)
+- [x] **P1-D2** `internal/semver.ts` — the only import of `semver` (ADR-02)
+- [x] **P1-D3** `errors.ts` — `MoltError`, 11 codes, cause chains, `isMoltError` brand check, `DisposalReport` ([03 §3](./03-core-implementation-spec.md))
+- [x] **P1-D4** `capability.ts` — token factory, policy field, id/version grammar, frozen output (ADR-05) ([03 §1](./03-core-implementation-spec.md))
+- [x] **P1-D5** `definition.ts` — types + 8-step validation + deep-shallow freeze (ADR-06) ([03 §2](./03-core-implementation-spec.md))
+- [x] **P1-D6** `scope.ts` — `Scope`, disposal engine (abort → LIFO → continue-on-error → report), `Symbol.asyncDispose` (ADR-09) ([03 §4](./03-core-implementation-spec.md))
+- [x] **P1-D7** `contributions.ts` — staged/commit snapshots, shadowing rules ([03 §6](./03-core-implementation-spec.md))
+- [x] **P1-D8** `resolver.ts` — selection, ranges, cycles with full path, deterministic order, reverse edges, `BlockedDiagnostic` ([03 §5](./03-core-implementation-spec.md))
+- [x] **P1-D9** `inspection.ts` — frozen snapshots, blocked-plugin tree renderer ([03 §8](./03-core-implementation-spec.md))
+- [x] **P1-D10** `runtime.ts` — lifecycle engine: transition table, activation (9 steps), replacement protocol, stop/cascade, uninstall, runtime disposal, observer bus ([03 §7](./03-core-implementation-spec.md))
+- [x] **P1-D11** `index.ts` — exact public surface of [03 §10](./03-core-implementation-spec.md); JSDoc + `@throws` on every export (ground rule 2); replaces and deletes `src/index.d.ts` (the P0 contract declaration)
 
 ### E. Core test files — every case enumerated in [04 §2](./04-test-plan.md)
 
-- [ ] **P1-E1** `internal/async.test.ts` — mutex/queue/wrapper/log in isolation
-- [ ] **P1-E2** `scope.test.ts` — 13 cases (INV-01/02/03/04/05/12)
-- [ ] **P1-E3** `resolver.test.ts` — 12 case groups (INV-10; note-04 provider rules exhaustively)
-- [ ] **P1-E4** `capability.test.ts`, `definition.test.ts`, `errors.test.ts`, `contributions.test.ts`, `inspection.test.ts`
-- [ ] **P1-E5** `runtime.test.ts` — 16 cases (INV-06/09/10/11/13; ADR-04 wait behavior; ADR-06 freeze)
-- [ ] **P1-E6** P0-B tests turn **green** (the contract tests pass against the real engine)
+- [x] **P1-E1** `internal/async.test.ts` — mutex/queue/wrapper/log in isolation
+- [x] **P1-E2** `scope.test.ts` — 13 cases (INV-01/02/03/04/05/12)
+- [x] **P1-E3** `resolver.test.ts` — 12 case groups (INV-10; note-04 provider rules exhaustively)
+- [x] **P1-E4** `capability.test.ts`, `definition.test.ts`, `errors.test.ts`, `contributions.test.ts`, `inspection.test.ts`
+- [x] **P1-E5** `runtime.test.ts` — 16 cases (INV-06/09/10/11/13; ADR-04 wait behavior; ADR-06 freeze)
+- [x] **P1-E6** P0-B tests turn **green** (the contract tests pass against the real engine)
 - [ ] **P1-E7** Property suite (`test/property/`): `arbWorld` / `arbFailureInjection` / `arbOperations` generators, reference model, INV assertions after every op, seeded determinism — [04 §3](./04-test-plan.md)
 - [ ] **P1-E8** Stress suite: 1,000-definition resolution budget, three-resource-kind replace-100×, 10k-op bounded memory — [04 §4](./04-test-plan.md)
-- [ ] **P1-E9** Environment matrix green: node 22/24 × happy-dom, windows/ubuntu/macos — [04 §5](./04-test-plan.md)
+- [x] **P1-E9** Environment matrix green: node 22/24 × happy-dom, windows/ubuntu/macos — [04 §5](./04-test-plan.md)
 - [ ] **P1-E10** Packaging: tsdown dual build + dts; package manifest per [01 §4](./01-repository-layout.md); `publint` + `attw` clean; tarball clean-install test — gates G7/G8 (ADR-07)
 - [ ] **P1-E11** API review file generated and human-reviewed (`*.api.md`) — gate G9
 - [ ] **P1-E12** Root `README.md` first version: thesis, guarantees + limits, non-goals, "why not Effect / `using` / Cordis" on the first screen (note [08](../notes/08-positioning-and-related-work.md) obligation)
@@ -162,4 +162,5 @@ _(P0-A9: fill this table at bootstrap; every entry pinned in the root `package.j
 | 2026-08-30 | — | Ledger created; design notes and implementation plan complete; runtime decision recorded (ADR-13: Node ≥22 target, Bun smoke-verified). |
 | 2026-08-30 | P0 | Bootstrap P0-A2…A9 complete and verified: `pnpm verify` green (typecheck + type-checked lint + knip), 3 rig smoke tests green, `pnpm test --coverage` green (thresholds wired; vacuous pass on empty `src/`, strict from P1), `pnpm check:arch` green (0 violations), all JSON/YAML validated. Deviations, all mirrored into the plan in the same change: Vitest 4 removed `vitest.workspace.ts` → projects live in the root `vitest.config.ts` (01/02/04 amended); TypeScript pinned to 5.9.3 because typescript-eslint's peer range requires `<6.1.0`; the runtime-core package skeleton (manifest, tsconfig, vitest config, smoke test) was created early as the rig's verification target — its P1 items remain open; `build`/`api-extract` scripts enter with tsdown/api-extractor at P1-E10/E11; CI stages awaiting their enabling items run `continue-on-error` with in-file markers. |
 | 2026-08-30 | P0 | P0-A1 open: GitHub organization `moltjs`, repository creation, first push, and branch protection require the owner's browser (no `gh` CLI in this environment). Local repository is fully staged for that push. |
+| 2026-08-30 | P1 | P1-C and P1-D complete: all 11 core modules implemented in dependency order; the P0 contract declaration (`src/index.d.ts`) deleted at P1-D11 as planned. P1-E1–E6 done: 137 unit tests green including all 11 replacement-contract gates (T-R1…T-R9 + ordering) against the real engine; TSC/ESLINT/knip/dependency-cruiser green; coverage enforced at the amended thresholds (runtime.ts defense-in-depth exception documented in plan 04 §6). Notable engine decisions made during test-driven development: dependency edges are recorded at commit from the resolution plan (plugins that never call require() still create dependents); stopping a preparing plugin aborts its scope signal synchronously at call time; multi-provider tokens aggregate per-provider collections; observer re-entry is rejected synchronously at call time; the note-02 `disposing` status is used during stop teardown. P1-E7 (property), E8 (stress), E10 (packaging), E11 (API review), E12 (README) remain open. |
 | 2026-08-30 | P0 | P0-B complete: 11 replacement-contract tests written before any runtime exists; they fail at import (designed red — plan 04 §7) while typecheck, lint, and architecture gates stay green, because the tests are typed against `src/index.d.ts`, a types-only transcription of plan 03 (deleted at P1-D11). Two spec gaps surfaced exactly as the Phase 0 stop condition intends, and were amended into the plan in the same change: (1) `Runtime.contributions(): ContributionSnapshot` gives hosts a committed-snapshot read side, without which T-R3's INV-06 visibility claim is unexpressible; (2) the replacement protocol resolves only after the old-scope disposal attempt completes, making INV-14's diagnostic deterministically inspectable (T-R4) and guaranteeing no floating disposer rejection (T-R8). |

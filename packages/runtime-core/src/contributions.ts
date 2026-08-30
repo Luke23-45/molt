@@ -75,6 +75,11 @@ export class StagedContributions {
     this.#staged.set(key.id, value);
   }
 
+  /** Staged contribution ids, pre-commit — the runtime checks conflicts against them. */
+  stagedIds(): readonly string[] {
+    return [...this.#staged.keys()];
+  }
+
   /**
    * Freezes this generation's set exactly once (INV-04 at contribution
    * granularity) and returns the entries the runtime may publish, keyed by

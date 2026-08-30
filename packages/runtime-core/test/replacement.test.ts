@@ -10,6 +10,7 @@
 
 import type { MoltError, PluginDefinition, RuntimeErrorCode } from '../src/index.js';
 import { capability, contributionKey, createRuntime, isMoltError } from '../src/index.js';
+import { createDeferred } from '../src/internal/async.js';
 
 // -----------------------------------------------------------------------------
 // Fake resources with counters (ledger P0-B1). P2 promotes this pattern into
@@ -65,9 +66,13 @@ function storagePlugin(counters: FakeResources, options: ProviderOptions = {}): 
     version: options.version ?? '1.0.0',
     provides: [{ capability: storage }],
     setup: async (ctx) => {
+      const dispose = (): void => {
+        counters.dispose();
+        options.onDispose?.();
+      };
       await ctx.scope.acquire(
         counters.create,
-        options.failDispose ? counters.faultyDispose : counters.dispose,
+        options.failDispose ? counters.faultyDispose : dispose,
       );
       ctx.provide(storage, { read: () => 1 });
       if (options.failSetup) {
@@ -152,18 +157,30 @@ describe('replacement contract (T-R1…T-R9, plan 04 §2)', () => {
 
   it('T-R2 / INV-07: failed candidate replacement keeps the old generation active and usable', async () => {
     const counters = makeCounters();
-    const { runtime, storageValue } = await startProviderWithConsumer(counters);
+    const runtime = createRuntime();
+    runtime.install(storagePlugin(counters));
+    await runtime.start('test.provider');
 
+    // No dependents exist here: INV-15 v1 (ADR-03) rejects replacements that
+    // DO have active dependents before any candidate scope is created (T-R9).
     await expectMoltRejection(
       runtime.replace(storagePlugin(counters, { version: '2.0.0', failSetup: true })),
       'REPLACEMENT_FAILED',
     );
 
     expect(runtime.getStatus('test.provider')).toBe('active');
-    expect(runtime.getStatus('test.consumer')).toBe('active');
-    expect(storageValue()?.read()).toBe(1); // the old generation still serves (INV-07)
+    // Usable (INV-07): a consumer started AFTER the failed window binds to
+    // the old generation's value - the runtime still serves it.
+    let bound: { read(): number } | undefined;
+    runtime.install(
+      consumerPlugin((value) => {
+        bound = value;
+      }),
+    );
+    await runtime.start('test.consumer');
+    expect(bound?.read()).toBe(1);
     // acquired: old generation + candidate; released: only the candidate's
-    // resource — a leaked candidate would show up here as live = 2.
+    // resource - a leaked candidate would show up here as live = 2.
     expect(counters.counters).toEqual({ acquired: 2, released: 1 });
   });
 
@@ -257,7 +274,7 @@ describe('replacement contract (T-R1…T-R9, plan 04 §2)', () => {
     const counters = makeCounters();
     const stopped: StoppedEvent[] = [];
     const runtime = createRuntime();
-    runtime.subscribe((event: { type: string; pluginId?: string; cascade?: readonly string[] }) => {
+    runtime.subscribe((event) => {
       if (event.type === 'stopped') {
         stopped.push({ pluginId: event.pluginId, cascade: event.cascade });
       }
@@ -343,7 +360,7 @@ describe('replacement contract (T-R1…T-R9, plan 04 §2)', () => {
     const counters = makeCounters();
     const log: string[] = [];
     const runtime = createRuntime();
-    runtime.subscribe((event: { type: string; pluginId?: string }) => {
+    runtime.subscribe((event) => {
       if (event.type === 'replaced' && event.pluginId === 'test.provider') {
         log.push('replaced');
       }
@@ -358,9 +375,10 @@ describe('replacement contract (T-R1…T-R9, plan 04 §2)', () => {
     expect(log).toEqual(['replaced', 'old-disposed']);
   });
 
-  it('P0-B11b / INV-06: stop during preparing — activation fails cleanly, resources disposed, nothing published', async () => {
+  it('P0-B11b / INV-06: stop during preparing - activation fails cleanly, resources disposed, nothing published', async () => {
     const counters = makeCounters();
     const runtime = createRuntime();
+    const entered = createDeferred<void>();
     runtime.install({
       id: 'test.slow',
       version: '1.0.0',
@@ -368,6 +386,7 @@ describe('replacement contract (T-R1…T-R9, plan 04 §2)', () => {
       setup: async (ctx) => {
         await ctx.scope.acquire(counters.create, counters.dispose);
         ctx.provide(storage, { read: () => 1 });
+        entered.resolve();
         await new Promise<void>((resolve) => {
           if (ctx.signal.aborted) {
             resolve();
@@ -379,8 +398,10 @@ describe('replacement contract (T-R1…T-R9, plan 04 §2)', () => {
       },
     });
 
-    const stopping = runtime.stop('test.slow'); // queued behind start (03 §7 busy policy)
-    await expectMoltRejection(runtime.start('test.slow'), 'ACTIVATION_FAILED');
+    const starting = runtime.start('test.slow');
+    await entered.promise; // the start op is now inside setup: status preparing
+    const stopping = runtime.stop('test.slow'); // aborts the preparing scope (03 sec 5)
+    await expectMoltRejection(starting, 'ACTIVATION_FAILED');
     await stopping;
 
     expect(runtime.getStatus('test.slow')).toBe('stopped');

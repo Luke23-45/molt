@@ -76,6 +76,51 @@ describe('validateDefinition', () => {
     expect(validateDefinition(disagrees)?.code).toBe('INVALID_DEFINITION');
   });
 
+  it('rejects non-array requires/provides from JS callers', () => {
+    const badRequires = {
+      id: 'test.j',
+      version: '1.0.0',
+      setup: () => undefined,
+      requires: 'nope',
+    } as unknown as PluginDefinition;
+    expect(validateDefinition(badRequires)?.code).toBe('INVALID_DEFINITION');
+    const badProvides = {
+      id: 'test.j',
+      version: '1.0.0',
+      setup: () => undefined,
+      provides: 'nope',
+    } as unknown as PluginDefinition;
+    expect(validateDefinition(badProvides)?.code).toBe('INVALID_DEFINITION');
+  });
+
+  it('rejects non-object requirement and provided entries from JS callers', () => {
+    const badRequirement = validDefinition({
+      requires: [
+        'storage' as unknown as PluginDefinition extends never ? never : ReturnType<typeof Object>,
+      ],
+    });
+    expect(validateDefinition(badRequirement)?.code).toBe('INVALID_DEFINITION');
+    const badProvided = validDefinition({
+      provides: [
+        null as unknown as PluginDefinition['provides'] extends never
+          ? never
+          : NonNullable<PluginDefinition['provides']>[number],
+      ],
+    });
+    expect(validateDefinition(badProvided)?.code).toBe('INVALID_DEFINITION');
+  });
+
+  it('rejects a non-boolean multiple on a provided entry from JS callers', () => {
+    const bad = validDefinition({
+      provides: [
+        { capability: storage, multiple: 'yes' } as unknown as NonNullable<
+          PluginDefinition['provides']
+        >[number],
+      ],
+    });
+    expect(validateDefinition(bad)?.code).toBe('INVALID_DEFINITION');
+  });
+
   it('rejects a plugin that requires what it provides (self-resolution, note 04)', () => {
     const selfReferential = validDefinition({
       requires: [{ capability: storage, range: '^1.0.0' }],

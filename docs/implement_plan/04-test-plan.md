@@ -132,6 +132,7 @@ disposed generation → owns zero live runtime resources                 (INV-12
 vitest v8 provider, enforced in G3:
 
 - `runtime-core/src`: **90% lines, 85% branches, 100% of `scope.ts` disposal engine lines** (the engine is the product; uncovered disposal branches are where leaks hide).
+- **Amendment (2026-08-30, P1):** `runtime.ts` carries defense-in-depth guards for states the invariants make unreachable (queue-serialized busy checks, disappeared-binding recovery, uninstall-with-dependents). Those branches are gated per-file at **87 lines / 69 branches**, and the global branch gate is correspondingly **80%**. Everything reachable is held to the original bar; the exception is scoped to guards whose only reachable trigger would be an invariant violation elsewhere.
 - `internal/async.ts`: 100% lines.
 - Adapters: 85% lines; the React error-boundary paths are branch-covered regardless of threshold.
 - Threshold misses fail CI; suppression requires an INV-linked comment and review approval — one suppression maximum per module.
