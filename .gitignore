@@ -15,6 +15,7 @@ demo/*/bench-results/
 
 # api-extractor scratch output
 temp/
+etc/api-temp/
 
 # tooling
 .eslintcache
