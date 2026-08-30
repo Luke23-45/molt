@@ -75,7 +75,7 @@ The single live task tracker for the whole build. Every deliverable from [00–0
 - [x] **P1-E6** P0-B tests turn **green** (the contract tests pass against the real engine)
 - [ ] **P1-E7** Property suite (`test/property/`): `arbWorld` / `arbFailureInjection` / `arbOperations` generators, reference model, INV assertions after every op, seeded determinism — [04 §3](./04-test-plan.md)
 - [ ] **P1-E8** Stress suite: 1,000-definition resolution budget, three-resource-kind replace-100×, 10k-op bounded memory — [04 §4](./04-test-plan.md)
-- [x] **P1-E9** Environment matrix green: node 22/24 × happy-dom, windows/ubuntu/macos — [04 §5](./04-test-plan.md)
+- [ ] **P1-E9** Environment matrix green: node 22/24 × happy-dom, windows/ubuntu/macos — [04 §5](./04-test-plan.md) — _local node 24 verified; the matrix itself runs in CI once the remote repository exists (P0-A1), plus a happy-dom unit run_
 - [ ] **P1-E10** Packaging: tsdown dual build + dts; package manifest per [01 §4](./01-repository-layout.md); `publint` + `attw` clean; tarball clean-install test — gates G7/G8 (ADR-07)
 - [ ] **P1-E11** API review file generated and human-reviewed (`*.api.md`) — gate G9
 - [ ] **P1-E12** Root `README.md` first version: thesis, guarantees + limits, non-goals, "why not Effect / `using` / Cordis" on the first screen (note [08](../notes/08-positioning-and-related-work.md) obligation)
