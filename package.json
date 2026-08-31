@@ -23,7 +23,7 @@
     "test": "vitest run --project unit --project unit-dom",
     "test:property": "vitest run --project property",
     "test:stress": "vitest run --project stress",
-    "test:adapters": "pnpm --filter @molt/test test && pnpm --filter @molt/events test && pnpm --filter @molt/react test && pnpm --filter @molt/vite test && pnpm --filter @molt/example-command-host test && pnpm --filter @molt/example-worker-host test",
+    "test:adapters": "pnpm --filter @molt/test test && pnpm --filter @molt/events test && pnpm --filter @molt/react test && pnpm --filter @molt/vite test && pnpm --filter @molt/example-command-host test && pnpm --filter @molt/example-worker-host test && pnpm --filter @molt/example-integration-demo test",
     "test:browser": "pnpm --filter @molt/browser-smoke test",
     "check:pkg": "pnpm --filter @molt/runtime --filter @molt/test --filter @molt/events --filter @molt/react --filter @molt/vite exec publint && pnpm --filter @molt/runtime --filter @molt/test --filter @molt/events --filter @molt/react --filter @molt/vite exec attw --pack .",
     "check:arch": "depcruise packages --config .cruiser.json",

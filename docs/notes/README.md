@@ -16,10 +16,11 @@ This is a design proposal, not a claim that the library already exists.
 2. [Core model and API](./02-core-model-and-api.md) — the host-neutral contracts.
 3. [Lifecycle and transactionality](./03-lifecycle-and-transactionality.md) — activation, failure, replacement, and disposal semantics.
 4. [Capabilities and dependencies](./04-capabilities-and-dependencies.md) — typed services, version ranges, provider selection, and dependent plugins.
-5. [Adapters and host integration](./05-adapters-and-host-integration.md) — package charters, React, Vite HMR, persistence, and database integration outside the core.
+5. [Adapters and host integration](./05-adapters-and-host-integration.md) — package charters, React, Vite HMR, and host integration outside the core.
 6. [Validation and release gates](./06-validation-and-release-gates.md) — tests, the comparison demo, and evidence required before publication.
 7. [Implementation roadmap](./07-implementation-roadmap.md) — an intentionally staged build plan with stop conditions.
 8. [Positioning and related work](./08-positioning-and-related-work.md) — existing systems, the unoccupied claim, and the naming record.
+9. [Packages and distribution](./09-packages-and-distribution.md) — publishable set, TanStack/Effect-style scoped distribution, install patterns, and how to add a new adapter.
 
 The executable engineering plan for these notes lives in [../implement_plan/](../implement_plan/README.md).
 

@@ -17,6 +17,7 @@ This is a public open-source library from its first commit. The quality bar belo
 | [06-ci-release-and-governance](./06-ci-release-and-governance.md)       | CI pipelines, release flow (changesets + provenance), branch protection, governance files, and the publish-day checklist.                                                                                         |
 | [07-readiness-and-remaining-work](./07-readiness-and-remaining-work.md) | Evidence-based review of the implemented core, release blockers, contract reconciliation, and the ordered plan for P1 revalidation through P5.                                                                    |
 | [ledger](./ledger.md)                                                   | **The live task tracker** — every deliverable as a checkable item, grouped by phase, referenced to its defining document. Work is tracked here and only here.                                                     |
+| [../notes/09-packages-and-distribution.md](../notes/09-packages-and-distribution.md) | Published set, TanStack/Effect distribution pattern, install matrix, and the 14-step checklist for adding a new adapter. |
 
 ## Ground rules
 
