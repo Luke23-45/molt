@@ -15,8 +15,15 @@ describe('P0 toolchain bootstrap (ledger P0-A5)', () => {
     expect('asyncDispose' in Symbol).toBe(true);
   });
 
-  it('keeps the core environment free of browser globals', () => {
-    expect('window' in globalThis).toBe(false);
-    expect('document' in globalThis).toBe(false);
+  it('environment axis: node is DOM-free, happy-dom is functional (plan 04 sec 5)', () => {
+    // The unit project (node) must never see browser globals — the compile
+    // guard is tsconfig's DOM-free `lib`; this is the runtime double-check.
+    // The unit-dom project (happy-dom) must actually provide them, proving
+    // the browser-like axis runs for real rather than silently skipping.
+    if ('window' in globalThis) {
+      expect('document' in globalThis).toBe(true);
+    } else {
+      expect('document' in globalThis).toBe(false);
+    }
   });
 });

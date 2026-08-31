@@ -6,12 +6,12 @@ Instructions for AI coding agents working in this repository. Followed by Codex,
 
 **Molt** is a general plugin runtime for safe replacement, in TypeScript, published as the `@molt/*` npm packages. Thesis: _a plugin is a versioned capability provider running inside an owned resource scope; a replacement is prepared in isolation, committed only after successful preparation, and followed by disposal of the previous generation._
 
-Status: **`@molt/runtime` implemented and packaged; the new property/stress suites are written but not yet executed.** All 11 core modules exist, 137 unit tests were green at last run (property/stress suites landed 2026-08-31 and await their first run), the dual ESM/CJS build emits `dist/` with publint/attw green, and the reviewed API file exists (`packages/runtime-core/etc/api/runtime.api.md`). Remaining P1 items: run E7/E8, CI matrix (E9), and the P0-A1 push. Check the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before assuming anything is built.
+Status: **`@molt/runtime` implemented and packaged, but P1 is not release-ready.** All 11 core modules exist, the unit suite and packaging gates are green, and the property/stress suites have now been executed and exposed unresolved resolver, disposal, harness, and contract issues. The dual ESM/CJS build emits `dist/` with publint/attw green, and the API file exists but still needs warning cleanup and human review (`packages/runtime-core/etc/api/runtime.api.md`). Read [`docs/implement_plan/07-readiness-and-remaining-work.md`](docs/implement_plan/07-readiness-and-remaining-work.md) and the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before assuming anything is release-ready.
 
 ## Authority chain — read in this order
 
 1. `docs/notes/01…08` — the design: thesis, guarantees, boundaries. **Decided.**
-2. `docs/implement_plan/00…06` — the binding engineering plan: architecture, file contracts, gates, per-module specs.
+2. `docs/implement_plan/00…06` — the binding engineering plan: architecture, file contracts, gates, per-module specs; [07](docs/implement_plan/07-readiness-and-remaining-work.md) is the evidence-based readiness addendum and does not relax them.
 3. `docs/implement_plan/ledger.md` — the only place work is tracked. Tick items there, with PR links.
 
 Where they conflict, the notes define intent and the plan defines execution; a change to either must be made **in the same PR** as the code that motivates it. Never simplify a guarantee in note 01/03 to make implementation easier — see the skill `molt-lifecycle-semantics`.
@@ -30,7 +30,7 @@ pnpm check:api                # api-extractor diff vs reviewed API files
 pnpm bench                    # comparison demo (naive registry vs Cordis vs Molt)
 ```
 
-`build`, `check:pkg`, and `check:api` work now. `test:property` and `test:stress` have suites since P1-E7/E8; their first execution is the deferred run/debug session — see the ledger before relying on a green run.
+`build`, `check:pkg`, and `check:api` exit successfully, although API Extractor warnings remain. `test:property` and `test:stress` have been executed and are currently red; see the ledger and readiness addendum before relying on a green run.
 
 ## Code style — the short list
 

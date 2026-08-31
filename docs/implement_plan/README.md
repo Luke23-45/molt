@@ -6,16 +6,17 @@ This is a public open-source library from its first commit. The quality bar belo
 
 ## Document index
 
-| Document | Contents |
-|---|---|
-| [00-system-architecture](./00-system-architecture.md) | Component map, canonical invariant registry, runtime state model, core algorithms (resolver, activation, replacement, cascade, disposal), concurrency model, error model, ADRs, required amendments to the notes. |
-| [01-repository-layout](./01-repository-layout.md) | Monorepo tree, workspace configuration, TypeScript strategy, the file-by-file contract for `runtime-core`, coding standards. |
-| [02-tooling-and-quality-gates](./02-tooling-and-quality-gates.md) | Toolchain choices with rationale (build, test, lint, property tests, API review, packaging checks) and the numbered quality gates wired into CI. |
-| [03-core-implementation-spec](./03-core-implementation-spec.md) | Per-module specification of `runtime-core`: public API, internal representation, algorithm pseudocode, and exhaustive edge-case lists. |
-| [04-test-plan](./04-test-plan.md) | Complete test inventory mapped to the release gates, property-based test design, stress and leak tests, environment matrix, coverage thresholds. |
-| [05-adapter-specs](./05-adapter-specs.md) | Specifications for the test kit and the four adapters (events, React, Vite HMR, SQLite), each with its failure-behavior requirements. |
-| [06-ci-release-and-governance](./06-ci-release-and-governance.md) | CI pipelines, release flow (changesets + provenance), branch protection, governance files, and the publish-day checklist. |
-| [ledger](./ledger.md) | **The live task tracker** — every deliverable as a checkable item, grouped by phase, referenced to its defining document. Work is tracked here and only here. |
+| Document                                                                | Contents                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [00-system-architecture](./00-system-architecture.md)                   | Component map, canonical invariant registry, runtime state model, core algorithms (resolver, activation, replacement, cascade, disposal), concurrency model, error model, ADRs, required amendments to the notes. |
+| [01-repository-layout](./01-repository-layout.md)                       | Monorepo tree, workspace configuration, TypeScript strategy, the file-by-file contract for `runtime-core`, coding standards.                                                                                      |
+| [02-tooling-and-quality-gates](./02-tooling-and-quality-gates.md)       | Toolchain choices with rationale (build, test, lint, property tests, API review, packaging checks) and the numbered quality gates wired into CI.                                                                  |
+| [03-core-implementation-spec](./03-core-implementation-spec.md)         | Per-module specification of `runtime-core`: public API, internal representation, algorithm pseudocode, and exhaustive edge-case lists.                                                                            |
+| [04-test-plan](./04-test-plan.md)                                       | Complete test inventory mapped to the release gates, property-based test design, stress and leak tests, environment matrix, coverage thresholds.                                                                  |
+| [05-adapter-specs](./05-adapter-specs.md)                               | Specifications for the test kit and the four adapters (events, React, Vite HMR, SQLite), each with its failure-behavior requirements.                                                                             |
+| [06-ci-release-and-governance](./06-ci-release-and-governance.md)       | CI pipelines, release flow (changesets + provenance), branch protection, governance files, and the publish-day checklist.                                                                                         |
+| [07-readiness-and-remaining-work](./07-readiness-and-remaining-work.md) | Evidence-based review of the implemented core, release blockers, contract reconciliation, and the ordered plan for P1 revalidation through P5.                                                                    |
+| [ledger](./ledger.md)                                                   | **The live task tracker** — every deliverable as a checkable item, grouped by phase, referenced to its defining document. Work is tracked here and only here.                                                     |
 
 ## Ground rules
 
@@ -31,11 +32,11 @@ These are hard rules. A pull request that violates any of them is rejected regar
 
 ## Phase overview
 
-| Phase | Scope (from note 07) | Exit gate |
-|---|---|---|
-| P0 | Replacement-contract tests written before any runtime code | The four contract tests exist, fail, and encode INV-01/07/06/11 |
-| P1 | `runtime-core` only | All unit, transaction, and property tests green; gates G1–G9 green |
-| P2 | Test kit (`@molt/test`) + two unrelated example hosts | Replacement and leak tests pass in both examples |
-| P3 | Adapters one at a time: events → React → Vite → SQLite | Each adapter's failures preserve core invariants |
-| P4 | Sky integration behind the adapters | Sky runs on Molt with the transitional layer marked as such |
-| P5 | Publication review against the thesis | Every item in the publish-evidence list exists; else the library stays internal |
+| Phase | Scope (from note 07)                                       | Exit gate                                                                       |
+| ----- | ---------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| P0    | Replacement-contract tests written before any runtime code | The four contract tests exist, fail, and encode INV-01/07/06/11                 |
+| P1    | `runtime-core` only                                        | All unit, transaction, and property tests green; gates G1–G9 green              |
+| P2    | Test kit (`@molt/test`) + two unrelated example hosts      | Replacement and leak tests pass in both examples                                |
+| P3    | Adapters one at a time: events → React → Vite → SQLite     | Each adapter's failures preserve core invariants                                |
+| P4    | Sky integration behind the adapters                        | Sky runs on Molt with the transitional layer marked as such                     |
+| P5    | Publication review against the thesis                      | Every item in the publish-evidence list exists; else the library stays internal |

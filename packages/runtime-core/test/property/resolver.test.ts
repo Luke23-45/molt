@@ -23,7 +23,7 @@ interface Attempt {
   readonly edges?: readonly (readonly [string, string, string])[];
 }
 
-function attempt(world: World, definitions: readonly PluginDefinition[]): Attempt {
+function attempt(world: World, definitions: readonly PluginDefinition[], root: string): Attempt {
   const hostProviders = new Map<string, HostProvider>();
   for (const cap of world.capabilities) {
     if (cap.host) {
@@ -36,10 +36,6 @@ function attempt(world: World, definitions: readonly PluginDefinition[]): Attemp
   const statuses = new Map<string, PluginStatus>();
   for (const definition of definitions) {
     statuses.set(definition.id, 'installed');
-  }
-  const root = definitions[0]?.id;
-  if (root === undefined) {
-    throw new Error('world has no plugins');
   }
   try {
     const plan = resolve({ definitions, statuses, hostProviders, root });
@@ -80,8 +76,13 @@ describe('resolver properties (plan 04 sec 3)', () => {
         const definitions = world.plugins.map((plugin, index) =>
           buildDefinition(plugin, world, minted, behaviors, index),
         );
-        const first = attempt(world, definitions);
-        const second = attempt(world, [...definitions].reverse());
+        // Both permutations resolve the SAME root — only the input order varies.
+        const root = world.plugins[0]?.id;
+        if (root === undefined) {
+          throw new Error('world has no plugins');
+        }
+        const first = attempt(world, definitions, root);
+        const second = attempt(world, [...definitions].reverse(), root);
         expect(second).toEqual(first);
 
         if (first.ok && first.order !== undefined && first.edges !== undefined) {

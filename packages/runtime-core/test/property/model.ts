@@ -305,16 +305,17 @@ export class ModelRuntime {
       return { ok: true }; // idempotent (INV-05)
     }
     this.disposed = true;
-    // Reverse activation order (plan 00 §4.6); no cascade field on the events.
+    // Reverse activation order (plan 00 §4.6). Runtime disposal emits ONE
+    // terminal event — no per-plugin stopped events (plan 03 §7); statuses
+    // change, the aggregate 'disposed' event is the notification.
     for (const generationId of [...this.activationOrder].reverse()) {
-      const { record: target, id: targetId } = this.#ownerOf(generationId);
+      const { record: target } = this.#ownerOf(generationId);
       if (this.genDisposeThrows.get(generationId) === true) {
         target.hasError = true;
       }
       target.status = 'stopped';
       target.generation = undefined;
       this.#withdrawGeneration(generationId);
-      this.events.push({ type: 'stopped', pluginId: targetId, generation: generationId });
     }
     this.events.push({ type: 'disposed' });
     return { ok: true };
