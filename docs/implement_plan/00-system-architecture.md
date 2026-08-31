@@ -33,23 +33,23 @@ Dependency direction inside core is strictly downward as drawn. `index.ts` re-ex
 
 Every guarantee in notes [01](../notes/01-thesis-and-boundaries.md), [03](../notes/03-lifecycle-and-transactionality.md), and [06](../notes/06-validation-and-release-gates.md) is restated here exactly once, numbered, and referenced by that number everywhere else (tests, code comments, ADRs). The notes remain the prose authority; this table is the mechanical authority.
 
-| ID | Invariant | Source |
-|---|---|---|
-| INV-01 | An activation failure disposes every resource acquired by that activation attempt. | notes 01 |
-| INV-02 | Disposal runs in reverse acquisition order (LIFO) within one scope. | notes 01, 03 |
-| INV-03 | Disposal continues after an individual disposer fails; every failure is collected. | notes 01, 03 |
-| INV-04 | A scope commits at most once, and an aborted scope can never commit. | notes 01, 03 |
-| INV-05 | A committed generation is disposed at most once; `dispose` is idempotent. | notes 01, 03 |
-| INV-06 | Staged capabilities and contributions are invisible to any observer before commit. | notes 01, 03 |
-| INV-07 | A failed replacement leaves the previous generation active and usable. | notes 01, 06 |
-| INV-08 | After a replacement commits, the old generation is never restored, even if its disposal fails. | notes 03 |
-| INV-09 | A plugin can only resolve capabilities its declared requirements permit. | notes 01, 04 |
-| INV-10 | Ambiguity, missing requirements, version conflicts, and cycles are structured errors, never warnings. | notes 01, README |
-| INV-11 | Stopping a provider with active dependents is rejected by default; cascade is explicit, ordered, and recorded. | notes 03 |
-| INV-12 | Every runtime-managed resource has an owner; a disposed generation owns zero live runtime resources. | README, notes 06 |
-| INV-13 | Runtime instances share no mutable state; no global registry exists. | notes 01, 02 |
-| INV-14 | If old-generation disposal fails after commit, the replacement still succeeds and the failure is inspectable. | notes 03 |
-| INV-15 | Replacing a provider with active dependents either replaces the whole dependent closure atomically or is rejected with a structured error; silent rebinding never happens. | notes 03 |
+| ID     | Invariant                                                                                                                                                                  | Source           |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| INV-01 | An activation failure disposes every resource acquired by that activation attempt.                                                                                         | notes 01         |
+| INV-02 | Disposal runs in reverse acquisition order (LIFO) within one scope.                                                                                                        | notes 01, 03     |
+| INV-03 | Disposal continues after an individual disposer fails; every failure is collected.                                                                                         | notes 01, 03     |
+| INV-04 | A scope commits at most once, and an aborted scope can never commit.                                                                                                       | notes 01, 03     |
+| INV-05 | A committed generation is disposed at most once; `dispose` is idempotent.                                                                                                  | notes 01, 03     |
+| INV-06 | Staged capabilities and contributions are invisible to any observer before commit.                                                                                         | notes 01, 03     |
+| INV-07 | A failed replacement leaves the previous generation active and usable.                                                                                                     | notes 01, 06     |
+| INV-08 | After a replacement commits, the old generation is never restored, even if its disposal fails.                                                                             | notes 03         |
+| INV-09 | A plugin can only resolve capabilities its declared requirements permit.                                                                                                   | notes 01, 04     |
+| INV-10 | Ambiguity, missing requirements, version conflicts, and cycles are structured errors, never warnings.                                                                      | notes 01, README |
+| INV-11 | Stopping a provider with active dependents is rejected by default; cascade is explicit, ordered, and recorded.                                                             | notes 03         |
+| INV-12 | Every runtime-managed resource has an owner; a disposed generation owns zero live runtime resources.                                                                       | README, notes 06 |
+| INV-13 | Runtime instances share no mutable state; no global registry exists.                                                                                                       | notes 01, 02     |
+| INV-14 | If old-generation disposal fails after commit, the replacement still succeeds and the failure is inspectable.                                                              | notes 03         |
+| INV-15 | Replacing a provider with active dependents either replaces the whole dependent closure atomically or is rejected with a structured error; silent rebinding never happens. | notes 03         |
 
 ## 3. Runtime state model
 
@@ -58,23 +58,23 @@ All state lives in a `Runtime` instance. There are no module-level mutable varia
 ```ts
 /** One installed definition plus its lifecycle bookkeeping. */
 interface PluginRecord {
-  definition: PluginDefinition;        // frozen at install (ADR-06)
-  status: PluginStatus;                // installed | preparing | active | disposing | stopped
-  activeGeneration?: Generation;       // present iff status is 'active'
-  queued: Promise<unknown>;            // tail of the per-plugin operation queue
+  definition: PluginDefinition; // frozen at install (ADR-06)
+  status: PluginStatus; // installed | preparing | active | disposing | stopped
+  activeGeneration?: Generation; // present iff status is 'active'
+  queued: Promise<unknown>; // tail of the per-plugin operation queue
 }
 
 /** One activation of one definition. The unit of ownership. */
 interface Generation {
-  id: string;                          // `${pluginId}#${n}` — monotonic per runtime
-  scope: Scope;                        // owns every resource of this generation
-  capabilities: Map<string, ProviderBinding>;   // published at commit only
+  id: string; // `${pluginId}#${n}` — monotonic per runtime
+  scope: Scope; // owns every resource of this generation
+  capabilities: Map<string, ProviderBinding>; // published at commit only
   contributions: Map<string, unknown>; // published at commit only
-  diagnostics: BoundedLog<DiagnosticEntry>;     // capped ring buffer (ADR-08)
+  diagnostics: BoundedLog<DiagnosticEntry>; // capped ring buffer (ADR-08)
 }
 
 interface ProviderBinding {
-  pluginId: string | null;             // null = host provider
+  pluginId: string | null; // null = host provider
   capability: Capability<unknown>;
   value: unknown;
 }
@@ -82,7 +82,7 @@ interface ProviderBinding {
 interface RuntimeState {
   plugins: Map<string, PluginRecord>;
   hostProviders: Map<string, ProviderBinding>;
-  generationCounter: number;           // monotonic, per runtime instance
+  generationCounter: number; // monotonic, per runtime instance
   observers: Set<RuntimeListener>;
 }
 ```
@@ -114,7 +114,7 @@ resolve(definitions, hostProviders):
   6. detect cycles over those edges (DFS with explicit stack)  → DEPENDENCY_CYCLE (full path)
   7. topologically sort with lexicographic tie-break           → deterministic order
   8. retain reverse edges as the dependents map (used by stop/cascade, INV-11)
-  9. emit ResolutionPlan { order, providers, edges }           (note 04)
+  9. emit ResolutionPlan { order, providers, edges }           (note 04); providers are keyed by consumer id and capability id
 ```
 
 Selection, not manifest order, drives the graph (note 04). Host providers are permanent single providers; a plugin that declares `provides` for a token already held by a host provider fails validation with `AMBIGUOUS_PROVIDER` unless it is the replacement of the generation that currently holds it (INV-06 staging makes that comparison possible).
@@ -195,18 +195,20 @@ Scope:
 ### 4.6 Runtime disposal (runtime.ts)
 
 `runtime.dispose()` stops accepting new operations, stops active generations in reverse activation order, and closes every scope. A second call is a no-op returning the first result (INV-05 at runtime granularity).
+It emits one terminal `disposed` event after teardown; it does not emit a
+synthetic `stopped` event for each generation.
 
 ## 5. Concurrency model
 
 - **Per-plugin operation queue.** Every `start`, `stop`, and `replace` call for plugin id X is appended to X's queue; operations run strictly in call order (note 03 requires serialization per id). A queued operation re-reads state when it runs — state may have changed between enqueue and execution.
-- **Definition-table lock.** `install` and `uninstall` mutate the plugin table under one async mutex, so resolution never observes a half-mutated table.
+- **Definition-table atomicity.** `install` is a synchronous mutation, so its complete definition record is visible before it returns; `uninstall` is serialized by the per-plugin operation queue. Resolution snapshots the table only after these synchronous mutations, so it never observes a half-mutated record. `AsyncMutex` remains the reusable primitive for future async table mutations, but the current public install contract does not defer installation into a promise.
 - **Internal activation path.** When activation needs a provider started (step 3), it invokes the activation routine directly instead of enqueueing a public `start` on the provider. This removes the classic lock-order deadlock (consumer's queue waits on provider's queue while the provider's activation waits on the consumer). The provider's own queue is still honored: if it has queued work, the consumer waits for the queue tail, never interleaves (ADR-04).
 - **Observer re-entry.** Listeners receive immutable snapshots and may not synchronously re-enter lifecycle operations for the same plugin; violations are rejected with a structured error (note 03). Async re-entry through the public API is fine — it just queues.
 - **No cancellation of running operations.** `stop` waits for `preparing` to settle; aborting a preparation is done by the scope signal, not by tearing down the queue.
 
 ## 6. Error model
 
-One error class, `MoltError`, with: `code` (the ten codes of note [02](../notes/02-core-model-and-api.md)), `pluginId`, `generation?`, `capabilityId?`, `path?` (dependency chain), and `cause` (original error, via the standard `Error` `cause` option). `MoltError` is the *only* error type thrown by core across its public API; a non-`MoltError` escaping core is a bug (gate G6 asserts this). `MoltError.from(value)` wraps unknown throwables, preserving the cause chain.
+One error class, `MoltError`, with: `code` (the ten codes of note [02](../notes/02-core-model-and-api.md)), `pluginId`, `generation?`, `capabilityId?`, `path?` (dependency chain), and `cause` (original error, via the standard `Error` `cause` option). `MoltError` is the _only_ error type thrown by core across its public API; a non-`MoltError` escaping core is a bug (gate G6 asserts this). `MoltError.from(value)` wraps unknown throwables, preserving the cause chain.
 
 **Required amendment to note 02:** lifecycle operations on missing-or-mis-typed states (starting an active plugin, uninstalling an active plugin, replacing an uninstalled id) need a state error. The plan adds error code `INVALID_STATE` to the code list; note 02 is amended in the same PR ([§9](#9-required-amendments-to-the-design-notes)).
 
@@ -221,20 +223,20 @@ Molt never uses weak references or finalizers; ownership is explicit and countab
 
 ## 8. Architecture decision records
 
-| ADR | Decision | Rationale / source |
-|---|---|---|
-| ADR-01 | Module set = the nine files of note 07 plus `internal/{semver,async}.ts` | note 06 requires that package exports prevent access to internals; a folder + `exports` map enforces what a flat file list cannot. |
-| ADR-02 | Semver comes from the `semver` package, wrapped in `internal/semver.ts` | note 04 forbids ad-hoc comparison and mandates "one well-defined semver package"; the wrapper isolates the only core dependency and allows a test fake. |
-| ADR-03 | v1 rejects provider replacement with active dependents; closure-atomic replacement comes later behind an explicit option | note 03: "must either prepare and commit the affected dependent closure together or reject"; reject-first is the smallest correct v1 (INV-15). |
-| ADR-04 | Internal activation path for provider startup; no nested public queueing | prevents lock-order deadlock between per-plugin queues (§5). |
-| ADR-05 | Tokens resolve by `id`, not object identity | Molt must work when a plugin and the host bundle separate copies of the factory; identity-keyed tokens would fork capability graphs silently. Type safety stays via the declared token; runtime safety via `id` + version. |
-| ADR-06 | Definitions are validated and shallow-frozen at `install` | note 02: "The setup function must not mutate the definition object"; freezing makes accidental mutation an immediate error. |
-| ADR-07 | Dual-format build: ESM + CJS, proper `exports` map, unbundled internals | plugin runtimes are consumed by bundlers *and* Node; SOTA packaging practice ([publint](https://publint.dev/), [attw](https://arethetypeswrong.github.io/), dual builds). Gates G7–G8 enforce it. |
-| ADR-08 | Diagnostics are a capped ring buffer per generation (default 100, configurable) | note 03 requires best-effort aggregation without unbounded growth. |
-| ADR-09 | `Scope` exposes `Symbol.asyncDispose`; `DisposableLike` is structurally compatible with the ECMAScript disposable protocol | note 08 obligation: `using` / `await using` must work inside plugins. |
-| ADR-10 | Queued operations wait (no busy-error code in v1) | note 03 allows either policy; waiting is the least surprising. Revisit only with a demonstrated need. |
-| ADR-11 | Single-source-of-truth invariant table (§2) with numbered IDs | prevents drift between notes, code comments, and tests. |
-| ADR-12 | ESM is the source format; `module: nodenext`; no decorators, no `reflect-metadata`, no experimental syntax | public library consumed by many toolchains; every non-standard feature becomes a consumer's problem. |
+| ADR    | Decision                                                                                                                                                                                            | Rationale / source                                                                                                                                                                                                                                                                                                        |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ADR-01 | Module set = the nine files of note 07 plus `internal/{semver,async}.ts`                                                                                                                            | note 06 requires that package exports prevent access to internals; a folder + `exports` map enforces what a flat file list cannot.                                                                                                                                                                                        |
+| ADR-02 | Semver comes from the `semver` package, wrapped in `internal/semver.ts`                                                                                                                             | note 04 forbids ad-hoc comparison and mandates "one well-defined semver package"; the wrapper isolates the only core dependency and allows a test fake.                                                                                                                                                                   |
+| ADR-03 | v1 rejects provider replacement with active dependents; closure-atomic replacement comes later behind an explicit option                                                                            | note 03: "must either prepare and commit the affected dependent closure together or reject"; reject-first is the smallest correct v1 (INV-15).                                                                                                                                                                            |
+| ADR-04 | Internal activation path for provider startup; no nested public queueing                                                                                                                            | prevents lock-order deadlock between per-plugin queues (§5).                                                                                                                                                                                                                                                              |
+| ADR-05 | Tokens resolve by `id`, not object identity                                                                                                                                                         | Molt must work when a plugin and the host bundle separate copies of the factory; identity-keyed tokens would fork capability graphs silently. Type safety stays via the declared token; runtime safety via `id` + version.                                                                                                |
+| ADR-06 | Definitions are validated and shallow-frozen at `install`                                                                                                                                           | note 02: "The setup function must not mutate the definition object"; freezing makes accidental mutation an immediate error.                                                                                                                                                                                               |
+| ADR-07 | Dual-format build: ESM + CJS, proper `exports` map, unbundled internals                                                                                                                             | plugin runtimes are consumed by bundlers _and_ Node; SOTA packaging practice ([publint](https://publint.dev/), [attw](https://arethetypeswrong.github.io/), dual builds). Gates G7–G8 enforce it.                                                                                                                         |
+| ADR-08 | Diagnostics are a capped ring buffer per generation (default 100, configurable)                                                                                                                     | note 03 requires best-effort aggregation without unbounded growth.                                                                                                                                                                                                                                                        |
+| ADR-09 | `Scope` exposes `Symbol.asyncDispose`; `DisposableLike` is structurally compatible with the ECMAScript disposable protocol                                                                          | note 08 obligation: `using` / `await using` must work inside plugins.                                                                                                                                                                                                                                                     |
+| ADR-10 | Queued operations wait (no busy-error code in v1)                                                                                                                                                   | note 03 allows either policy; waiting is the least surprising. Revisit only with a demonstrated need.                                                                                                                                                                                                                     |
+| ADR-11 | Single-source-of-truth invariant table (§2) with numbered IDs                                                                                                                                       | prevents drift between notes, code comments, and tests.                                                                                                                                                                                                                                                                   |
+| ADR-12 | ESM is the source format; `module: nodenext`; no decorators, no `reflect-metadata`, no experimental syntax                                                                                          | public library consumed by many toolchains; every non-standard feature becomes a consumer's problem.                                                                                                                                                                                                                      |
 | ADR-13 | **Target runtime is Node (≥22).** Bun is a verified secondary environment: CI imports the built `dist/` under Bun and runs a minimal lifecycle smoke test; core contains zero runtime-specific code | core does no I/O, so Bun's advantages are irrelevant to it, while a Bun-only target would contradict the host-agnostic thesis (note 01); the smoke test turns "works under Bun" into a proven claim instead of a hope. Dev toolchain stays pnpm/vitest/tsdown — those choices serve library shipping, not dev-loop speed. |
 
 ## 9. Required amendments to the design notes
@@ -248,13 +250,16 @@ The plan must not silently diverge from the notes. These amendments are applied 
 5. **note 02** — `Runtime` gains `contributions(): ContributionSnapshot` and the `ContributionSnapshot`/`ContributionEntry` types are added to the public surface (recorded in [03 §6](./03-core-implementation-spec.md); forced by the P0-B contract tests — without a committed-snapshot read side, the INV-06 visibility claim of T-R3 is not expressible through the public API). The replacement protocol additionally resolves only after the old-scope disposal attempt completes, so INV-14's diagnostic is deterministically inspectable (T-R4) and no disposer rejection is ever floating (T-R8).
 6. **note 02** — `RuntimeInspection` gains `plugins[].diagnostics` and `observerDiagnostics` (recorded in [03 §8](./03-core-implementation-spec.md); forced by the stress suite — the ADR-08 bounded-memory assertion of plan [04 §4](./04-test-plan.md) is not expressible through the public API without a read side for the capped diagnostic logs).
 7. **plan refinement of [§4.2 step 7](#42-activation-runtimets)** — commit-time capability-conflict checks exempt `multiple: true` tokens: multi-provider tokens coexist by design (note 04 aggregation, consistent with the install-time host guard, which already exempts them). `Generation.resolvedProviders` tracks **every** selected provider per capability (`capabilityId → Set<generationId>`): single-valued tracking silently dropped co-providers of multi tokens and under-counted dependents (INV-11/15).
+8. **note 02** — the implemented capability token carries an explicit `multiple` policy option; the runtime surface is `inspect()` plus `contributions()`, and inspection/observer snapshots expose the diagnostic fields required by ADR-08.
+9. **note 03** — candidate resolution and static provider-conflict checks occur before candidate scope creation; all candidate failures are wrapped as `REPLACEMENT_FAILED` with the structured cause preserved. Runtime disposal emits only the terminal `disposed` event after teardown.
+10. **note 02 / plan 03** — `MoltErrorInit` and `BlockedDiagnostic` are public types because they occur in public signatures and are exported from `index.ts`; their fields are documented and included in API review.
 
 ## 10. Explicitly deferred (with the phase that may revisit)
 
-| Deferred item | Revisit in |
-|---|---|
-| Closure-atomic replacement of dependent closures | P1.5, behind `replace(id, { mode: 'closure' })` |
-| Synchronous re-entry policy for observers | only with a written queueing policy + tests (note 03) |
-| Sandbox or permission model | never in core; see note [05 §Security](../notes/05-adapters-and-host-integration.md) |
-| Automatic semver-range backtracking (pick an older provider if the newest fails) | rejected for v1 — determinism beats cleverness (note 04) |
-| Deno smoke test (same shape as the Bun smoke, ADR-13) | P5, optional — add when there is user demand, not before |
+| Deferred item                                                                    | Revisit in                                                                           |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Closure-atomic replacement of dependent closures                                 | P1.5, behind `replace(id, { mode: 'closure' })`                                      |
+| Synchronous re-entry policy for observers                                        | only with a written queueing policy + tests (note 03)                                |
+| Sandbox or permission model                                                      | never in core; see note [05 §Security](../notes/05-adapters-and-host-integration.md) |
+| Automatic semver-range backtracking (pick an older provider if the newest fails) | rejected for v1 — determinism beats cleverness (note 04)                             |
+| Deno smoke test (same shape as the Bun smoke, ADR-13)                            | P5, optional — add when there is user demand, not before                             |

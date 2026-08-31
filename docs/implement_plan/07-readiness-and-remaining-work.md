@@ -4,22 +4,22 @@ This addendum records the first full review of the implemented `@molt/runtime` c
 
 ## Review boundary and evidence
 
-Review date: 2026-08-31. The review covered the source tree, design notes 01–08, plans 00–06, the ledger, CI configuration, public API review output, and the test suites. No production implementation was changed during this review.
+Review date: 2026-08-31. The review covered the source tree, design notes 01–08, plans 00–06, the ledger, CI configuration, public API review output, and the test suites. The corrective implementation and revalidation changes recorded below are part of this worktree.
 
 The current worktree already contains user changes in `packages/runtime-core/test/property/resolver.test.ts` and `packages/runtime-core/test/toolchain.test.ts`; those changes are preserved.
 
-| Area                 | Result                                | Meaning                                                                                                                                  |
-| -------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm verify`        | Green                                 | Typecheck, lint, and knip pass for the current tree.                                                                                     |
-| `pnpm test`          | Green: 274 tests                      | Unit, DOM, and transaction tests pass; this does not cover the failing property/stress paths.                                            |
-| `pnpm test:coverage` | Green: 91.75% lines / 80.69% branches | Thresholds pass, but coverage is not evidence that the property/stress failures are resolved.                                            |
-| `pnpm check:arch`    | Green                                 | Current dependency-cruiser rules pass.                                                                                                   |
-| `pnpm build`         | Green                                 | Dual ESM/CJS build succeeds.                                                                                                             |
-| `pnpm check:pkg`     | Green                                 | `publint` and `attw` pass.                                                                                                               |
-| `pnpm check:api`     | Exit 0 with warnings                  | API review is generated but still needs warning cleanup and human sign-off.                                                              |
-| `pnpm test:property` | Red                                   | Resolver oracle direction and lifecycle disposal-event behavior require correction; the run also exposed core resolution/disposal risks. |
-| `pnpm test:stress`   | Red: 3 of 4 files                     | Two fixtures do not publish their declared capability; the soak generator creates invalid capability IDs.                                |
-| Remote CI / P0-A1    | Blocked externally                    | GitHub organization/repository creation, first push, and branch protection require the owner’s browser.                                  |
+| Area                 | Result                                | Meaning                                                                                                   |
+| -------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `pnpm verify`        | Green                                 | Typecheck, lint, and knip pass for the current tree.                                                      |
+| `pnpm test`          | Green: 290 tests                      | Unit, DOM, and transaction tests pass.                                                                      |
+| `pnpm test:coverage` | Green: 91.51% lines / 80.46% branches | Package-local thresholds pass; property and stress suites are separately green below.                     |
+| `pnpm check:arch`    | Green                                 | Current dependency-cruiser rules pass.                                                                    |
+| `pnpm build`         | Green                                 | Dual ESM/CJS build succeeds.                                                                              |
+| `pnpm check:pkg`     | Green                                 | `publint` and `attw` pass.                                                                                |
+| `pnpm check:api`     | Green, warning-free                  | API report matches the built public declarations; the surface was manually checked against plan 03 §10. |
+| `pnpm test:property` | Green after correction                | The resolver oracle and lifecycle model were corrected, then rerun with fixed and random seeds.           |
+| `pnpm test:stress`   | Green: 3 files / 4 tests              | Resolution budget, leak, replacement-failure, and bounded-soak checks pass.                               |
+| Remote CI / P0-A1    | Blocked externally                    | GitHub organization/repository creation, first push, and branch protection require the owner’s browser.   |
 
 ## Release blockers found
 
@@ -29,17 +29,17 @@ These are ordered by correctness risk. The first four must be addressed before s
 
 The implemented code and documents are not fully synchronized. Resolve these questions in a short ADR or same-change note amendment before implementation:
 
-1. Does resolution validate only the root dependency closure, or every installed definition? The current resolver processes every definition, while the runtime API is root-start oriented.
-2. Does `Runtime.dispose()` emit `stopped` events for active generations, or only the final `disposed` event? The property model currently expects the former.
-3. What is the exact replacement failure shape? The contract requires `REPLACEMENT_FAILED`; the underlying resolution/validation cause must remain inspectable without publishing candidate state.
-4. Which exposed types are intentionally public? `MoltErrorInit` and `BlockedDiagnostic` are referenced by public signatures but are currently reported by API Extractor as forgotten exports.
-5. Which snapshot guarantee is promised: immutable owned metadata, or recursively frozen values? Opaque contribution values are host-owned and must not be recursively frozen; the distinction must be explicit.
+1. Resolution validates every installed definition for a deterministic global plan, while activation order is the root's dependency closure. This preserves the plan's all-definition validation rule and the runtime's root-start API.
+2. `Runtime.dispose()` emits only the final `disposed` event after teardown; it does not synthesize per-plugin `stopped` events. This is the terminal runtime event contract.
+3. Replacement failures are always structured `REPLACEMENT_FAILED` errors; the underlying validation or resolution cause remains in `cause` and candidate state is never published.
+4. `MoltErrorInit` and `BlockedDiagnostic` are intentionally public because they occur in public signatures and are exported from `index.ts`.
+5. Snapshots recursively freeze runtime-owned metadata and containers, while opaque host-owned values and throwable causes are isolated by reference and are not recursively frozen.
 
 Update the affected design notes, plan text, tests, and ledger entry in the same change as each decision. Do not make a failing test pass by silently changing the contract.
 
 ### R1. Make provider selection consumer-specific
 
-`resolver.ts` currently stores selection by capability ID alone. If two consumers require the same capability ID with different semver ranges, the later resolution overwrites the earlier selection. The runtime then reads a provider that may not satisfy the requesting consumer, or reports that a valid binding disappeared.
+The original implementation stored selection by capability ID alone. If two consumers require the same capability ID with different semver ranges, the later resolution overwrote the earlier selection. The runtime then read a provider that might not satisfy the requesting consumer.
 
 Implementation sequence:
 
@@ -54,7 +54,7 @@ Acceptance: a provider selected for one consumer cannot satisfy another consumer
 
 ### R2. Make replacement preparation a real isolated resolution
 
-The replacement candidate path currently prepares a candidate context without the active resolution plan. Its requirement lookup can therefore hand the candidate an incompatible active provider. It also lacks the host-provider conflict preflight that normal installation performs, so a candidate can publish a single-valued capability already owned by the host.
+The original replacement candidate path prepared a candidate context without the active resolution plan. Its requirement lookup could therefore hand the candidate an incompatible active provider. It also lacked the host-provider conflict preflight that normal installation performs, so a candidate could publish a single-valued capability already owned by the host.
 
 Implementation sequence:
 
@@ -69,7 +69,7 @@ Acceptance: failed replacement leaves the old generation active and usable; cand
 
 ### R3. Close the runtime-disposal/preparing race
 
-`Runtime.dispose()` marks the runtime disposed and tears down active generations, but an in-flight preparation can later commit an active generation after disposal. A deterministic deferred-setup test reproduced this: disposal completed while the plugin remained preparing, then releasing the setup gate allowed it to become active with no disposer call.
+The original `Runtime.dispose()` marked the runtime disposed and tore down active generations, but an in-flight preparation could later commit an active generation after disposal. A deterministic deferred-setup test reproduced this: disposal completed while the plugin remained preparing, then releasing the setup gate allowed it to become active with no disposer call.
 
 Implementation sequence:
 
@@ -80,11 +80,11 @@ Implementation sequence:
 5. Dispose active generations in reverse activation order, continue after failures, and aggregate diagnostics according to the decided event contract.
 6. Add deterministic deferred tests for disposal during setup, queued start during disposal, replacement during disposal, double disposal, and late candidate completion.
 
-Acceptance: after `await runtime.dispose()`, no future microtask can publish capabilities, contributions, active status, or disposal work for a generation that was still preparing. INV-05, INV-06, INV-07, INV-08, and INV-14 remain true.
+Acceptance: after `await runtime.dispose()`, no future microtask can publish capabilities, contributions, or active status for a generation that was still preparing. If suspended setup later returns an owned disposer, it is still run once as late cleanup; it cannot commit state. INV-05, INV-06, INV-07, INV-08, and INV-14 remain true.
 
 ### R4. Make inspection and error snapshots genuinely safe
 
-The outer inspection object is frozen, but exposed `MoltError` and diagnostic records remain mutable. Mutating an error or diagnostic obtained from one inspection changes later inspections. A `Map` snapshot is isolated by copying its entries, but freezing a `Map` does not freeze its internal storage; the promised boundary must be documented and tested.
+The original outer inspection object was frozen, but exposed `MoltError` and diagnostic records remained mutable. Mutating an error or diagnostic obtained from one inspection could change later inspections. A `Map` snapshot is isolated by copying its entries, but freezing a `Map` does not freeze its internal storage; the boundary is now documented and tested.
 
 Implementation sequence:
 
@@ -97,7 +97,7 @@ Acceptance: an inspection or observer payload is a stable snapshot and cannot mu
 
 ### R5. Complete defensive validation and strict-code cleanup
 
-The review also found smaller but binding quality issues:
+The review found smaller but binding quality issues; the corrective pass addressed each one:
 
 - `internal/async.ts` uses non-null assertions in `createDeferred`, prohibited by the repository rules.
 - Resolver input validation does not fully reject malformed versions and malformed token flags when called with forged JavaScript objects.
@@ -105,7 +105,7 @@ The review also found smaller but binding quality issues:
 - API Extractor reports forgotten public types, missing package documentation, and incomplete member documentation.
 - TSDoc contains unclosed backticks in `definition.ts`.
 
-Fix these after R1–R4, with focused tests for each rejected shape and exact `MoltError` code. Resolve the public-type decision from R0 before changing exports. Regenerate the API file and obtain human review; an exit code of zero with warnings is not the P1-E11 Definition of Done.
+The focused tests now cover each rejected shape and exact `MoltError` code. The public-type decision is reflected in the exports, the API file was regenerated and manually checked against plan 03 §10, and `check:api` is warning-free.
 
 ## P1 revalidation sequence
 
@@ -122,7 +122,7 @@ The implementation order is deliberately narrower than the future package roadma
 | 7     | Correct the property/stress harness                   | Resolver edge assertion direction, lifecycle model event contract, capability publication in fixtures, grammar-valid soak IDs. |
 | 8     | Full P1 evidence run                                  | `pnpm verify`, unit + coverage, property, stress, build, arch, package, API, and remote matrix.                                |
 
-Do not tick P1-E7, P1-E8, P1-E9, or P1-E11 merely because the suites or wiring exist. Each remains open until its required run and review evidence is attached. P0-A1 remains a separate external prerequisite for remote CI and branch protection.
+Do not tick P1-E7, P1-E8, P1-E9, or P1-E11 merely because the suites or wiring exist. E7, E8, and E11 have local evidence but remain formally open until the PR-linked ledger update; E9 remains open until remote CI runs. P0-A1 remains a separate external prerequisite for remote CI and branch protection.
 
 ## P2–P5 implementation roadmap after P1
 

@@ -5,14 +5,20 @@
 // plans (candidates sorted, ready sets lexicographic).
 
 import type { Capability } from './capability.js';
-import { isValidRuntimeId } from './capability.js';
 import type { PluginDefinition, PluginStatus } from './definition.js';
+import { validateDefinition } from './definition.js';
 import { MoltError } from './errors.js';
 import { satisfiesRange } from './internal/semver.js';
 
 export interface HostProvider {
   readonly capability: Capability<unknown>;
   readonly value: unknown;
+}
+
+/** The published capability view supplied to isolated replacement resolution. @internal */
+export interface CandidateProvider {
+  readonly pluginId: string | null;
+  readonly capability: Capability<unknown>;
 }
 
 interface ProviderSelection {
@@ -24,8 +30,13 @@ interface ProviderSelection {
 export interface ResolutionPlan {
   /** Activation order for the closure: providers first, root last. */
   readonly order: readonly string[];
-  /** capabilityId → selected providers in documented order (host first, then id lexicographic). */
-  readonly providers: ReadonlyMap<string, readonly ProviderSelection[]>;
+  /**
+   * consumer plugin id → capability id → selected providers in documented
+   * order (host first, then id lexicographic). A selection belongs to the
+   * consumer requirement that produced it; capability id alone is not a
+   * sufficient key when consumers request different ranges.
+   */
+  readonly providers: ReadonlyMap<string, ReadonlyMap<string, readonly ProviderSelection[]>>;
   readonly edges: readonly ResolutionEdge[];
   /** Informational diagnostics (e.g. optional requirements with incompatible candidates). */
   readonly diagnostics: readonly BlockedDiagnostic[];
@@ -39,16 +50,30 @@ interface ResolutionEdge {
   readonly optional: boolean;
 }
 
+/**
+ * Diagnostic explaining why a requirement had no selectable provider.
+ *
+ * @public
+ */
 export interface BlockedDiagnostic {
+  /** Plugin that could not satisfy the requirement. */
   readonly pluginId: string;
+  /** Requirement that produced the diagnostic. */
   readonly requirement: {
+    /** Capability identifier requested by the plugin. */
     readonly capabilityId: string;
+    /** Semver range accepted by the plugin. */
     readonly range: string;
+    /** Whether the requirement was optional. */
     readonly optional: boolean;
   };
+  /** Providers considered by resolution and their verdicts. */
   readonly candidates: readonly {
+    /** Provider plugin id, or `null` for a host provider. */
     readonly pluginId: string | null;
+    /** Capability version offered by the provider. */
     readonly version: string;
+    /** Why the provider was or was not selectable. */
     readonly verdict: 'incompatible' | 'stopped' | 'ok';
   }[];
 }
@@ -69,6 +94,10 @@ interface Candidate {
 }
 
 const HOST_EDGE_TARGET = '(host)';
+
+function validateResolverDefinition(definition: PluginDefinition): MoltError | undefined {
+  return validateDefinition(definition);
+}
 
 function blockedDiagnostic(
   pluginId: string,
@@ -100,11 +129,9 @@ export function resolve(input: ResolutionInput): ResolutionPlan {
   // already; the resolver never trusts its input).
   const byId = new Map<string, PluginDefinition>();
   for (const definition of definitions) {
-    if (!isValidRuntimeId(definition.id) || typeof definition.version !== 'string') {
-      throw new MoltError({
-        code: 'INVALID_DEFINITION',
-        message: `invalid plugin identity: ${String(definition.id)}`,
-      });
+    const failure = validateResolverDefinition(definition);
+    if (failure !== undefined) {
+      throw failure;
     }
     if (byId.has(definition.id)) {
       throw new MoltError({
@@ -154,7 +181,7 @@ export function resolve(input: ResolutionInput): ResolutionPlan {
     }
   }
 
-  const selection = new Map<string, ProviderSelection[]>();
+  const selection = new Map<string, Map<string, ProviderSelection[]>>();
   const edges: ResolutionEdge[] = [];
   const diagnostics: BlockedDiagnostic[] = [];
 
@@ -238,7 +265,12 @@ export function resolve(input: ResolutionInput): ResolutionPlan {
         }
         return a.pluginId < b.pluginId ? -1 : a.pluginId > b.pluginId ? 1 : 0;
       });
-      selection.set(
+      let consumerSelections = selection.get(definition.id);
+      if (consumerSelections === undefined) {
+        consumerSelections = new Map<string, ProviderSelection[]>();
+        selection.set(definition.id, consumerSelections);
+      }
+      consumerSelections.set(
         capabilityId,
         ordered.map((candidate) => ({
           pluginId: candidate.pluginId,
@@ -370,4 +402,124 @@ export function resolve(input: ResolutionInput): ResolutionPlan {
     edges,
     diagnostics,
   };
+}
+
+/**
+ * Resolves one replacement candidate against the currently published view.
+ * The old generation is intentionally present in this view because it remains
+ * authoritative until candidate commit (INV-07).
+ */
+export function resolveCandidate(input: {
+  readonly definition: PluginDefinition;
+  readonly providers: readonly CandidateProvider[];
+}): ResolutionPlan {
+  const { definition, providers } = input;
+  const selected = new Map<string, Map<string, readonly ProviderSelection[]>>();
+  const edges: ResolutionEdge[] = [];
+  const diagnostics: BlockedDiagnostic[] = [];
+
+  for (const requirement of definition.requires ?? []) {
+    const pool = providers
+      .filter(
+        (provider) =>
+          provider.capability.id === requirement.capability.id &&
+          // A candidate cannot bind to its own old generation: that binding is
+          // withdrawn at commit, and note 04 rejects self-resolution.
+          provider.pluginId !== definition.id,
+      )
+      .map((provider) => ({
+        pluginId: provider.pluginId,
+        capabilityVersion: provider.capability.version,
+        selectable: true,
+      }));
+    const compatible = pool.filter((candidate) =>
+      satisfiesRange(candidate.capabilityVersion, requirement.range),
+    );
+    const selectable = compatible;
+    const diagnostic = blockedDiagnostic(
+      definition.id,
+      requirement.capability.id,
+      requirement.range,
+      requirement.optional === true,
+      pool,
+      compatible,
+    );
+
+    if (selectable.length === 0) {
+      if (requirement.optional === true) {
+        if (pool.length > 0) {
+          diagnostics.push(diagnostic);
+        }
+        continue;
+      }
+      if (pool.length === 0) {
+        throw new MoltError({
+          code: 'MISSING_CAPABILITY',
+          message: `no active provider for capability ${requirement.capability.id}`,
+          pluginId: definition.id,
+          capabilityId: requirement.capability.id,
+          details: { blocked: [diagnostic] },
+        });
+      }
+      throw new MoltError({
+        code: 'INCOMPATIBLE_CAPABILITY',
+        message: `no active provider of ${requirement.capability.id} satisfies ${requirement.range}`,
+        pluginId: definition.id,
+        capabilityId: requirement.capability.id,
+        details: { blocked: [diagnostic] },
+      });
+    }
+
+    if (selectable.length > 1 && requirement.capability.multiple !== true) {
+      throw new MoltError({
+        code: 'AMBIGUOUS_PROVIDER',
+        message: `${selectable.length} active providers satisfy ${requirement.capability.id}@${requirement.range}`,
+        pluginId: definition.id,
+        capabilityId: requirement.capability.id,
+        details: { blocked: [diagnostic] },
+      });
+    }
+
+    const ordered = [...selectable].sort(compareCandidates);
+    let consumerSelections: Map<string, readonly ProviderSelection[]> | undefined = selected.get(
+      definition.id,
+    );
+    if (consumerSelections === undefined) {
+      consumerSelections = new Map<string, readonly ProviderSelection[]>();
+      selected.set(definition.id, consumerSelections);
+    }
+    consumerSelections.set(
+      requirement.capability.id,
+      ordered.map((candidate) => ({
+        pluginId: candidate.pluginId,
+        capabilityVersion: candidate.capabilityVersion,
+      })),
+    );
+    for (const candidate of ordered) {
+      edges.push({
+        from: definition.id,
+        to: candidate.pluginId ?? HOST_EDGE_TARGET,
+        capabilityId: requirement.capability.id,
+        range: requirement.range,
+        optional: requirement.optional === true,
+      });
+    }
+  }
+
+  return {
+    order: [definition.id],
+    providers: selected,
+    edges,
+    diagnostics,
+  };
+}
+
+function compareCandidates(a: Candidate, b: Candidate): number {
+  if (a.pluginId === null) {
+    return b.pluginId === null ? 0 : -1;
+  }
+  if (b.pluginId === null) {
+    return 1;
+  }
+  return a.pluginId < b.pluginId ? -1 : a.pluginId > b.pluginId ? 1 : 0;
 }

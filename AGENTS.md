@@ -6,7 +6,7 @@ Instructions for AI coding agents working in this repository. Followed by Codex,
 
 **Molt** is a general plugin runtime for safe replacement, in TypeScript, published as the `@molt/*` npm packages. Thesis: _a plugin is a versioned capability provider running inside an owned resource scope; a replacement is prepared in isolation, committed only after successful preparation, and followed by disposal of the previous generation._
 
-Status: **`@molt/runtime` implemented and packaged, but P1 is not release-ready.** All 11 core modules exist, the unit suite and packaging gates are green, and the property/stress suites have now been executed and exposed unresolved resolver, disposal, harness, and contract issues. The dual ESM/CJS build emits `dist/` with publint/attw green, and the API file exists but still needs warning cleanup and human review (`packages/runtime-core/etc/api/runtime.api.md`). Read [`docs/implement_plan/07-readiness-and-remaining-work.md`](docs/implement_plan/07-readiness-and-remaining-work.md) and the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before assuming anything is release-ready.
+Status: **`@molt/runtime` implemented and packaged, but P1 is not release-ready until remote CI and P0-A1 are complete.** All 11 core modules exist; unit, property, stress, coverage, architecture, packaging, build, and API gates are green locally. The dual ESM/CJS build emits `dist/` with publint/attw green, and the reviewed API file is warning-free (`packages/runtime-core/etc/api/runtime.api.md`). Read [`docs/implement_plan/07-readiness-and-remaining-work.md`](docs/implement_plan/07-readiness-and-remaining-work.md) and the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before calling the release ready.
 
 ## Authority chain — read in this order
 
@@ -30,7 +30,7 @@ pnpm check:api                # api-extractor diff vs reviewed API files
 pnpm bench                    # comparison demo (naive registry vs Cordis vs Molt)
 ```
 
-`build`, `check:pkg`, and `check:api` exit successfully, although API Extractor warnings remain. `test:property` and `test:stress` have been executed and are currently red; see the ledger and readiness addendum before relying on a green run.
+`build`, `check:pkg`, and `check:api` exit successfully with no API Extractor warnings. `test:property` and `test:stress` pass locally with both fixed and random property seeds; the node/OS remote matrix remains pending P0-A1.
 
 ## Code style — the short list
 

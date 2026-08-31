@@ -107,7 +107,18 @@ describe('isMoltError', () => {
 });
 
 describe('structured fields are frozen', () => {
-  it('details are shallow-frozen — mutation is rejected', () => {
+  it('freezes the error object and nested structured details', () => {
+    const error = new MoltError({
+      code: 'INVALID_STATE',
+      message: 'x',
+      details: { nested: { value: 1 } },
+    });
+    expect(Object.isFrozen(error)).toBe(true);
+    expect(Object.isFrozen(error.details)).toBe(true);
+    expect(Object.isFrozen(error.details?.['nested'])).toBe(true);
+  });
+
+  it('details are immutable — mutation is rejected', () => {
     const error = new MoltError({
       code: 'INVALID_STATE',
       message: 'x',

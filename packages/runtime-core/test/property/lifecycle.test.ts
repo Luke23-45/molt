@@ -248,9 +248,9 @@ describe('INV-01/05/06/07/11/12: model-based lifecycle properties (plan 04 sec 3
           runtime.subscribe((event) => {
             engineEvents.push({
               type: event.type,
-              pluginId: event.pluginId,
-              generation: event.generation,
-              cascade: event.cascade === undefined ? undefined : [...event.cascade],
+              ...(event.pluginId !== undefined ? { pluginId: event.pluginId } : {}),
+              ...(event.generation !== undefined ? { generation: event.generation } : {}),
+              ...(event.cascade !== undefined ? { cascade: [...event.cascade] } : {}),
             });
           });
           const harness: Harness = {

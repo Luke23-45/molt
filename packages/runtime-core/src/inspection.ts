@@ -6,6 +6,50 @@ import type { DiagnosticInput, PluginStatus } from './definition.js';
 import type { BlockedDiagnostic } from './resolver.js';
 import type { RuntimeInspection } from './runtime.js';
 
+function cloneAndFreeze(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((entry) => cloneAndFreeze(entry)));
+  }
+  if (typeof value === 'object' && value !== null) {
+    if (Object.prototype.toString.call(value) === '[object Object]') {
+      const copy: Record<string, unknown> = {};
+      for (const key of Object.keys(value)) {
+        // Validated boundary: the object tag above limits this copy to record-like data.
+        const entry = (value as Readonly<Record<string, unknown>>)[key];
+        copy[key] = cloneAndFreeze(entry);
+      }
+      return Object.freeze(copy);
+    }
+  }
+  return value;
+}
+
+function snapshotDetails(
+  details: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  // The input has already crossed the typed DiagnosticInput boundary; this
+  // runtime copy preserves the record shape while isolating nested metadata.
+  return cloneAndFreeze(details) as Readonly<Record<string, unknown>>;
+}
+
+function snapshotDiagnostic(input: DiagnosticInput): DiagnosticInput {
+  return Object.freeze({
+    message: input.message,
+    ...(input.severity !== undefined ? { severity: input.severity } : {}),
+    ...(input.details !== undefined ? { details: snapshotDetails(input.details) } : {}),
+  });
+}
+
+function snapshotBlocked(blocked: BlockedDiagnostic): BlockedDiagnostic {
+  return Object.freeze({
+    pluginId: blocked.pluginId,
+    requirement: Object.freeze({ ...blocked.requirement }),
+    candidates: Object.freeze(
+      blocked.candidates.map((candidate) => Object.freeze({ ...candidate })),
+    ),
+  });
+}
+
 export interface InspectionPluginInput {
   readonly id: string;
   readonly status: PluginStatus;
@@ -51,9 +95,11 @@ export function buildInspection(input: {
           // exactOptionalPropertyTypes: absent fields stay absent.
           ...(plugin.generationId !== undefined ? { generation: plugin.generationId } : {}),
           ...(plugin.error !== undefined ? { error: plugin.error } : {}),
-          ...(plugin.blocked !== undefined ? { blockedBy: plugin.blocked } : {}),
+          ...(plugin.blocked !== undefined
+            ? { blockedBy: Object.freeze(plugin.blocked.map(snapshotBlocked)) }
+            : {}),
           ...(plugin.diagnostics !== undefined
-            ? { diagnostics: Object.freeze([...plugin.diagnostics]) }
+            ? { diagnostics: Object.freeze(plugin.diagnostics.map(snapshotDiagnostic)) }
             : {}),
         }),
       ),

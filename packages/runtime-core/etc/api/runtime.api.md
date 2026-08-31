@@ -5,6 +5,21 @@
 ```ts
 
 // @public
+export interface BlockedDiagnostic {
+    readonly candidates: readonly {
+        readonly pluginId: string | null;
+        readonly version: string;
+        readonly verdict: 'incompatible' | 'stopped' | 'ok';
+    }[];
+    readonly pluginId: string;
+    readonly requirement: {
+        readonly capabilityId: string;
+        readonly range: string;
+        readonly optional: boolean;
+    };
+}
+
+// @public
 export interface Capability<T> {
     readonly __type?: T;
     // (undocumented)
@@ -61,13 +76,11 @@ export interface DiagnosticInput {
 
 // @public
 export interface DisposableLike {
-    // (undocumented)
-    dispose: () => void | Promise<void>;
+    readonly dispose: () => void | Promise<void>;
 }
 
 // @public
 export interface DisposalReport {
-    // (undocumented)
     readonly errors: readonly unknown[];
 }
 
@@ -76,7 +89,6 @@ export function isMoltError(value: unknown): value is MoltError;
 
 // @public
 export class MoltError extends Error {
-    // Warning: (ae-forgotten-export) The symbol "MoltErrorInit" needs to be exported by the entry point index.d.ts
     constructor(init: MoltErrorInit, cause?: unknown);
     // (undocumented)
     readonly capabilityId: string | undefined;
@@ -91,6 +103,17 @@ export class MoltError extends Error {
     readonly path: readonly string[] | undefined;
     // (undocumented)
     readonly pluginId: string | undefined;
+}
+
+// @public
+export interface MoltErrorInit {
+    readonly capabilityId?: string | undefined;
+    readonly code: RuntimeErrorCode;
+    readonly details?: Readonly<Record<string, unknown>> | undefined;
+    readonly generation?: string | undefined;
+    readonly message: string;
+    readonly path?: readonly string[] | undefined;
+    readonly pluginId?: string | undefined;
 }
 
 // @public
@@ -229,10 +252,6 @@ export interface Scope {
     onDispose(disposer: () => void | Promise<void>): void;
     readonly signal: AbortSignal;
 }
-
-// Warnings were encountered during analysis:
-//
-// src/runtime.ts:40:5 - (ae-forgotten-export) The symbol "BlockedDiagnostic" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

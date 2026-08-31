@@ -6,7 +6,7 @@ import { capability } from '../src/capability.js';
 import type { PluginDefinition, PluginStatus } from '../src/definition.js';
 import { isMoltError, MoltError } from '../src/errors.js';
 import type { HostProvider, ResolutionPlan } from '../src/resolver.js';
-import { resolve } from '../src/resolver.js';
+import { resolve, resolveCandidate } from '../src/resolver.js';
 
 function expectCode(run: () => unknown, code: MoltError['code']): MoltError {
   let thrown: unknown;
@@ -88,7 +88,7 @@ describe('deterministic resolution (note 04 requirement 7)', () => {
       root: 'test.consumer',
     });
     expect(plan.order).toEqual(['test.alpha', 'test.beta', 'test.consumer']);
-    const selected = plan.providers.get('test.multi2');
+    const selected = plan.providers.get('test.consumer')?.get('test.multi2');
     expect(selected?.map((selection) => selection.pluginId)).toEqual(['test.alpha', 'test.beta']);
   });
 });
@@ -172,10 +172,12 @@ describe('missing, incompatible, ambiguous, and multi providers (note 04)', () =
       hostProviders,
       root: 'test.consumer',
     });
-    expect(plan.providers.get('test.multi')?.map((selection) => selection.pluginId)).toEqual([
-      null,
-      'test.plugin',
-    ]);
+    expect(
+      plan.providers
+        .get('test.consumer')
+        ?.get('test.multi')
+        ?.map((selection) => selection.pluginId),
+    ).toEqual([null, 'test.plugin']);
   });
 
   it('a compatible-but-stopped provider is never selected and shows verdict stopped', () => {
@@ -236,6 +238,71 @@ describe('missing, incompatible, ambiguous, and multi providers (note 04)', () =
 });
 
 describe('version ranges and host providers', () => {
+  it('INV-10: keeps separate selections for consumers with different ranges', () => {
+    const v1 = capability('test.shared', '1.0.0');
+    const v2 = capability('test.shared', '2.0.0');
+    const providerV1 = definition({ id: 'test.provider-v1', provides: [{ capability: v1 }] });
+    const providerV2 = definition({ id: 'test.provider-v2', provides: [{ capability: v2 }] });
+    const consumerV1 = definition({
+      id: 'test.consumer-v1',
+      requires: [{ capability: v1, range: '^1.0.0' }],
+    });
+    const consumerV2 = definition({
+      id: 'test.consumer-v2',
+      requires: [{ capability: v2, range: '^2.0.0' }],
+    });
+    const definitions = [providerV1, providerV2, consumerV1, consumerV2];
+    const plan = resolve({
+      definitions,
+      statuses: noStatuses(definitions),
+      hostProviders: new Map(),
+      root: consumerV1.id,
+    });
+
+    expect(plan.providers.get(consumerV1.id)?.get(v1.id)?.[0]?.pluginId).toBe(providerV1.id);
+    expect(plan.providers.get(consumerV2.id)?.get(v2.id)?.[0]?.pluginId).toBe(providerV2.id);
+  });
+
+  it('INV-10: candidate resolution preserves optional diagnostics and multi ordering', () => {
+    const optional = definition({
+      id: 'test.optional-candidate',
+      requires: [{ capability: storage, range: '^2.0.0', optional: true }],
+    });
+    const optionalPlan = resolveCandidate({
+      definition: optional,
+      providers: [{ pluginId: 'test.v1', capability: storage }],
+    });
+    expect(optionalPlan.providers.size).toBe(0);
+    expect(optionalPlan.diagnostics[0]?.candidates[0]?.verdict).toBe('incompatible');
+
+    const required = definition({
+      id: 'test.required-candidate',
+      requires: [{ capability: storage, range: '*' }],
+    });
+    expectCode(
+      () => resolveCandidate({ definition: required, providers: [] }),
+      'MISSING_CAPABILITY',
+    );
+
+    const multiConsumer = definition({
+      id: 'test.multi-candidate',
+      requires: [{ capability: multi, range: '*' }],
+    });
+    const multiPlan = resolveCandidate({
+      definition: multiConsumer,
+      providers: [
+        { pluginId: 'test.plugin.z', capability: multi },
+        { pluginId: 'test.plugin.a', capability: multi },
+        { pluginId: null, capability: multi },
+      ],
+    });
+    expect(multiPlan.providers.get(multiConsumer.id)?.get(multi.id)).toEqual([
+      { pluginId: null, capabilityVersion: multi.version },
+      { pluginId: 'test.plugin.a', capabilityVersion: multi.version },
+      { pluginId: 'test.plugin.z', capabilityVersion: multi.version },
+    ]);
+  });
+
   it('ranges select by capability version via semver — never lexical comparison', () => {
     const v9 = definition({
       id: 'test.v9',
@@ -257,7 +324,9 @@ describe('version ranges and host providers', () => {
       root: 'test.consumer',
     });
     // Lexical comparison would pick '9.0.0'; semver picks 10.0.0.
-    expect(plan.providers.get('test.r')?.[0]?.capabilityVersion).toBe('10.0.0');
+    expect(plan.providers.get('test.consumer')?.get('test.r')?.[0]?.capabilityVersion).toBe(
+      '10.0.0',
+    );
   });
 
   it('stopped providers never win over active ones; active ones are reused', () => {
@@ -278,9 +347,12 @@ describe('version ranges and host providers', () => {
       hostProviders: new Map(),
       root: 'test.consumer',
     });
-    expect(plan.providers.get('test.storage')?.map((selection) => selection.pluginId)).toEqual([
-      'test.active',
-    ]);
+    expect(
+      plan.providers
+        .get('test.consumer')
+        ?.get('test.storage')
+        ?.map((selection) => selection.pluginId),
+    ).toEqual(['test.active']);
   });
 
   it('host providers join the candidate pool - a second single claim is ambiguous', () => {
@@ -334,7 +406,7 @@ describe('cycle detection with full paths (note 04 requirement 6)', () => {
     expect(error.path).toEqual(['test.a', 'test.b', 'test.a']);
   });
 
-  it('detects a self-edge as a cycle', () => {
+  it('rejects self-resolution at the definition boundary', () => {
     const token = capability('test.self', '1.0.0');
     const self = definition({
       id: 'test.self',
@@ -349,9 +421,9 @@ describe('cycle detection with full paths (note 04 requirement 6)', () => {
           hostProviders: new Map(),
           root: 'test.self',
         }),
-      'DEPENDENCY_CYCLE',
+      'INVALID_DEFINITION',
     );
-    expect(error.path).toEqual(['test.self', 'test.self']);
+    expect(error.details?.['capabilityId']).toBe('test.self');
   });
 
   it('a provider excluded by version selection cannot create a cycle', () => {

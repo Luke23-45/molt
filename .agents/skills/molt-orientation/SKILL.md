@@ -38,7 +38,7 @@ demo/comparison/           # three-way demo: naive registry vs Cordis vs Molt (P
 
 ## Status check — always do this first
 
-Read the progress log at the bottom of `docs/implement_plan/ledger.md` and the first unchecked item. Never assume a package, script, or gate exists without a checked ledger item saying so. As of the 2026-08-31 session: the core is implemented and packaged (build, publint/attw, and the reviewed API file all exist), the property/stress suites are written but have not been executed yet, and the open items are running E7/E8, the CI matrix (E9, needs the P0-A1 push), and the push itself.
+Read the progress log at the bottom of `docs/implement_plan/ledger.md` and the first unchecked item. Never assume a package, script, or gate exists without a checked ledger item saying so. As of the 2026-08-31 session: the core is implemented and packaged (build, publint/attw, and the warning-free reviewed API file all exist), the property/stress suites pass locally with fixed and random seeds, and the open items are remote CI matrix validation (E9, needs the P0-A1 push), the formal PR-linked ledger ticks, and the push itself.
 
 ## Non-negotiables (full lists in the referenced docs)
 

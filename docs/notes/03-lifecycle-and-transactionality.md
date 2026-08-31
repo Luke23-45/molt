@@ -64,6 +64,11 @@ old active generation
 
 The old generation remains the authoritative active generation until candidate commit. If old disposal fails after commit, the replacement still succeeds but returns or records a `DISPOSAL_FAILED` diagnostic. The runtime must never silently restore the old generation after the new generation has become observable, because both generations may have already interacted with the host.
 
+Candidate resolution and static provider-conflict checks happen before a
+candidate scope is created. A failure in candidate resolution or preparation is
+reported as `REPLACEMENT_FAILED`, with the structured underlying failure
+preserved as its cause. The old generation remains active and usable.
+
 If the replaced plugin provides capabilities consumed by active dependents, the runtime must not leave those dependents holding references to the old provider. The first implementation must either prepare and commit the affected dependent closure together or reject the replacement with a structured error. Silent rebinding is not allowed.
 
 ## What “transactional” means here
@@ -99,6 +104,8 @@ Restarting is explicit. The runtime must not unexpectedly restart user-disabled 
 - `dispose()` is idempotent.
 - An aborted scope cannot be committed.
 - The runtime closes all active scopes when the runtime itself is disposed.
+- Runtime disposal emits the terminal `disposed` event after active scopes have
+  been closed; it does not synthesize per-plugin `stopped` events.
 
 Async disposers are awaited. Hosts may choose a timeout, but a timeout must produce a diagnostic and must not be described as successful cleanup.
 

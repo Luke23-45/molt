@@ -121,6 +121,34 @@ describe('validateDefinition', () => {
     expect(validateDefinition(bad)?.code).toBe('INVALID_DEFINITION');
   });
 
+  it('rejects malformed token policy, optional flags, and null collections', () => {
+    const missingPolicy = validDefinition({
+      requires: [
+        {
+          capability: { id: 'test.storage', version: '1.0.0' },
+          range: '^1.0.0',
+        } as unknown as NonNullable<PluginDefinition['requires']>[number],
+      ],
+    });
+    expect(validateDefinition(missingPolicy)?.code).toBe('INVALID_DEFINITION');
+
+    const badOptional = validDefinition({
+      requires: [
+        {
+          capability: storage,
+          range: '^1.0.0',
+          optional: 'yes',
+        } as unknown as NonNullable<PluginDefinition['requires']>[number],
+      ],
+    });
+    expect(validateDefinition(badOptional)?.code).toBe('INVALID_DEFINITION');
+
+    const nullCollections = validDefinition({
+      requires: null as unknown as PluginDefinition['requires'],
+    });
+    expect(validateDefinition(nullCollections)?.code).toBe('INVALID_DEFINITION');
+  });
+
   it('rejects a plugin that requires what it provides (self-resolution, note 04)', () => {
     const selfReferential = validDefinition({
       requires: [{ capability: storage, range: '^1.0.0' }],

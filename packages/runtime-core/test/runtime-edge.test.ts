@@ -233,4 +233,144 @@ describe('replacement candidates with requirements (plan 00 sec 4.3)', () => {
     expect(observed).toBe('host-b');
     expect(runtime.getStatus('test.provider')).toBe('active');
   });
+
+  it('INV-07: an incompatible candidate requirement fails before candidate setup', async () => {
+    const runtime = createRuntime({ providers: [{ capability: capB, value: { id: 'host-b' } }] });
+    let setupCalled = false;
+    runtime.install({
+      id: 'test.provider',
+      version: '1.0.0',
+      provides: [{ capability: capA }],
+      setup: (ctx) => {
+        ctx.provide(capA, { id: 'old' });
+      },
+    });
+    await runtime.start('test.provider');
+
+    const error = await rejectionOf(
+      runtime.replace({
+        id: 'test.provider',
+        version: '2.0.0',
+        requires: [{ capability: capB, range: '^2.0.0' }],
+        provides: [{ capability: capA }],
+        setup: (ctx) => {
+          setupCalled = true;
+          ctx.require(capB);
+          ctx.provide(capA, { id: 'candidate' });
+        },
+      }),
+    );
+    const replacementError = expectCode(error, 'REPLACEMENT_FAILED');
+    expect(isMoltError(replacementError.cause)).toBe(true);
+    expect((replacementError.cause as MoltError).code).toBe('INCOMPATIBLE_CAPABILITY');
+    expect(setupCalled).toBe(false);
+    expect(runtime.getStatus('test.provider')).toBe('active');
+    expect(runtime.inspect().capabilities).toEqual([
+      { id: capA.id, provider: 'test.provider', version: capA.version },
+      { id: capB.id, provider: '(host)', version: capB.version },
+    ]);
+  });
+
+  it('INV-06: a candidate cannot claim a host-owned single capability', async () => {
+    const runtime = createRuntime({ providers: [{ capability: capB, value: { id: 'host-b' } }] });
+    runtime.install({
+      id: 'test.provider',
+      version: '1.0.0',
+      provides: [{ capability: capA }],
+      setup: (ctx) => {
+        ctx.provide(capA, { id: 'old' });
+      },
+    });
+    await runtime.start('test.provider');
+
+    const error = await rejectionOf(
+      runtime.replace({
+        id: 'test.provider',
+        version: '2.0.0',
+        provides: [{ capability: capB }],
+        setup: (ctx) => {
+          ctx.provide(capB, { id: 'candidate' });
+        },
+      }),
+    );
+    const replacementError = expectCode(error, 'REPLACEMENT_FAILED');
+    expect(isMoltError(replacementError.cause)).toBe(true);
+    expect((replacementError.cause as MoltError).code).toBe('AMBIGUOUS_PROVIDER');
+    expect(runtime.getStatus('test.provider')).toBe('active');
+    expect(runtime.inspect().capabilities).toContainEqual({
+      id: capA.id,
+      provider: 'test.provider',
+      version: capA.version,
+    });
+  });
+});
+
+describe('runtime disposal during preparation (INV-04/06)', () => {
+  it('does not publish a preparation that completes after runtime disposal', async () => {
+    const runtime = createRuntime();
+    const entered = createDeferred<void>();
+    const release = createDeferred<void>();
+    runtime.install({
+      id: 'test.slow-dispose',
+      version: '1.0.0',
+      provides: [{ capability: capA }],
+      setup: async (ctx) => {
+        entered.resolve();
+        await release.promise;
+        ctx.provide(capA, { id: 'late' });
+      },
+    });
+
+    const starting = runtime.start('test.slow-dispose');
+    await entered.promise;
+    await runtime.dispose();
+    release.resolve();
+
+    expectCode(await rejectionOf(starting), 'ACTIVATION_FAILED');
+    expect(runtime.inspect().capabilities).toEqual([]);
+    expect(runtime.getStatus('test.slow-dispose')).toBe('stopped');
+  });
+});
+
+describe('immutable inspection snapshots (INV-06, plan 03 sec 8)', () => {
+  it('freezes diagnostics and error details without exposing mutable runtime state', async () => {
+    const runtime = createRuntime();
+    const diagnosticDetails = { nested: { value: 1 } };
+    runtime.install({
+      id: 'test.snapshot',
+      version: '1.0.0',
+      setup: (ctx) => {
+        ctx.diagnose({ message: 'stable', details: diagnosticDetails });
+      },
+    });
+    await runtime.start('test.snapshot');
+
+    const inspection = runtime.inspect();
+    const diagnostic = inspection.plugins.find((plugin) => plugin.id === 'test.snapshot')
+      ?.diagnostics?.[0];
+    expect(diagnostic).toBeDefined();
+    expect(Object.isFrozen(diagnostic)).toBe(true);
+    expect(Object.isFrozen(diagnostic?.details)).toBe(true);
+    expect(Object.isFrozen(diagnostic?.details?.['nested'])).toBe(true);
+    diagnosticDetails.nested.value = 2;
+    expect(
+      runtime.inspect().plugins.find((plugin) => plugin.id === 'test.snapshot')?.diagnostics?.[0]
+        ?.details?.['nested'],
+    ).toEqual({ value: 1 });
+
+    runtime.install({
+      id: 'test.failed-snapshot',
+      version: '1.0.0',
+      requires: [{ capability: capA, range: '^2.0.0' }],
+      setup: () => undefined,
+    });
+    await rejectionOf(runtime.start('test.failed-snapshot'));
+    const error = runtime
+      .inspect()
+      .plugins.find((plugin) => plugin.id === 'test.failed-snapshot')?.error;
+    expect(error).toBeInstanceOf(MoltError);
+    expect(Object.isFrozen(error)).toBe(true);
+    expect(Object.isFrozen((error as MoltError).details)).toBe(true);
+    expect(Object.isFrozen((error as MoltError).details?.['blocked'])).toBe(true);
+  });
 });

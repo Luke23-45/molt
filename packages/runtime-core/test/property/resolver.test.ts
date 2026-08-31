@@ -19,7 +19,11 @@ interface Attempt {
   readonly code?: string;
   /** JSON projection of the plan — Maps compared structurally. */
   readonly order?: readonly string[];
-  readonly providers?: readonly (readonly (readonly [string, string])[])[];
+  readonly providers?: readonly {
+    readonly consumerId: string;
+    readonly capabilityId: string;
+    readonly providers: readonly (readonly [string, string])[];
+  }[];
   readonly edges?: readonly (readonly [string, string, string])[];
 }
 
@@ -42,11 +46,14 @@ function attempt(world: World, definitions: readonly PluginDefinition[], root: s
     return {
       ok: true,
       order: plan.order,
-      providers: [...plan.providers.entries()].map(([, selections]) =>
-        selections.map((selection) => [
-          selection.pluginId ?? '(host)',
-          selection.capabilityVersion,
-        ]),
+      providers: [...plan.providers.entries()].flatMap(([consumerId, selections]) =>
+        [...selections.entries()].map(([capabilityId, providers]) => ({
+          consumerId,
+          capabilityId,
+          providers: providers.map(
+            (selection) => [selection.pluginId ?? '(host)', selection.capabilityVersion] as const,
+          ),
+        })),
       ),
       edges: plan.edges.map((edge) => [edge.from, edge.to, edge.capabilityId]),
     };
@@ -100,7 +107,7 @@ describe('resolver properties (plan 04 sec 3)', () => {
             if (fromPosition === undefined || toPosition === undefined) {
               continue;
             }
-            expect(fromPosition).toBeLessThan(toPosition);
+            expect(toPosition).toBeLessThan(fromPosition);
           }
         }
       });

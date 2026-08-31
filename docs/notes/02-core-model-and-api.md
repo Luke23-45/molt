@@ -4,15 +4,15 @@ This is the proposed public shape. Names may change during implementation, but t
 
 ## Core concepts
 
-| Concept | Meaning |
-|---|---|
-| Plugin definition | Immutable metadata plus an asynchronous setup function |
-| Capability | A typed contract identified by a stable ID and version |
-| Requirement | A capability and compatible version range needed by a plugin |
-| Scope | The ownership boundary for resources acquired by one generation |
-| Generation | One installed plugin instance, including its private scope |
-| Contribution | A staged runtime registration published at commit |
-| Runtime | The owner of definitions, dependency resolution, generations, and diagnostics |
+| Concept           | Meaning                                                                       |
+| ----------------- | ----------------------------------------------------------------------------- |
+| Plugin definition | Immutable metadata plus an asynchronous setup function                        |
+| Capability        | A typed contract identified by a stable ID and version                        |
+| Requirement       | A capability and compatible version range needed by a plugin                  |
+| Scope             | The ownership boundary for resources acquired by one generation               |
+| Generation        | One installed plugin instance, including its private scope                    |
+| Contribution      | A staged runtime registration published at commit                             |
+| Runtime           | The owner of definitions, dependency resolution, generations, and diagnostics |
 
 ## Capability tokens
 
@@ -22,10 +22,15 @@ Capabilities are tokens, not arbitrary strings passed around by convention.
 export interface Capability<T> {
   readonly id: string;
   readonly version: string;
+  readonly multiple: boolean;
   readonly __type?: T;
 }
 
-export function capability<T>(id: string, version: string): Capability<T>;
+export function capability<T>(
+  id: string,
+  version: string,
+  options?: { readonly multiple?: boolean },
+): Capability<T>;
 ```
 
 The token ID is stable. The version is compared using one documented semver implementation. A host may provide a capability before any plugin starts; a plugin may provide one during setup. The runtime must reject a provider that claims a token but does not publish a value before commit.
@@ -38,22 +43,16 @@ export interface PluginDefinition {
   readonly version: string;
   readonly requires?: readonly Requirement[];
   readonly provides?: readonly ProvidedCapability[];
-  readonly setup: (context: PluginContext) =>
-    | void
-    | DisposableLike
-    | Promise<void | DisposableLike>;
+  readonly setup: (
+    context: PluginContext,
+  ) => void | DisposableLike | Promise<void | DisposableLike>;
 }
 
 export interface DisposableLike {
   dispose: () => void | Promise<void>;
 }
 
-export type PluginStatus =
-  | 'installed'
-  | 'preparing'
-  | 'active'
-  | 'disposing'
-  | 'stopped';
+export type PluginStatus = 'installed' | 'preparing' | 'active' | 'disposing' | 'stopped';
 
 export interface Requirement {
   readonly capability: Capability<unknown>;
@@ -92,10 +91,7 @@ The core API uses explicit registration rather than an unbounded `effect(setup, 
 export interface Scope {
   readonly signal: AbortSignal;
   onDispose(disposer: () => void | Promise<void>): void;
-  acquire<T>(
-    create: () => T | Promise<T>,
-    dispose: (value: T) => void | Promise<void>,
-  ): Promise<T>;
+  acquire<T>(create: () => T | Promise<T>, dispose: (value: T) => void | Promise<void>): Promise<T>;
   isDisposed(): boolean;
 }
 ```
@@ -157,8 +153,9 @@ export interface Runtime {
   stop(id: string, options?: { cascade?: boolean }): Promise<void>;
   replace(definition: PluginDefinition): Promise<void>;
   getStatus(id: string): PluginStatus | undefined;
-  inspect(id?: string): RuntimeInspection;
+  inspect(): RuntimeInspection;
   subscribe(listener: RuntimeListener): () => void;
+  contributions(): ContributionSnapshot;
   dispose(): Promise<void>;
 }
 
@@ -179,11 +176,17 @@ export interface RuntimeInspection {
     status: PluginStatus;
     generation?: string;
     error?: unknown;
+    blockedBy?: readonly BlockedDiagnostic[];
+    diagnostics?: readonly DiagnosticInput[];
   }[];
   readonly capabilities: readonly {
     id: string;
     provider: string;
     version: string;
+  }[];
+  readonly observerDiagnostics: readonly {
+    readonly message: string;
+    readonly cause: unknown;
   }[];
 }
 
@@ -192,12 +195,18 @@ export interface RuntimeListener {
     type: 'installed' | 'started' | 'stopped' | 'replaced' | 'failed' | 'disposed';
     pluginId?: string;
     generation?: string;
+    cascade?: readonly string[];
     error?: unknown;
   }): void;
 }
 ```
 
 There is no exported global registry. `createRuntime()` returns an independent instance.
+
+`RuntimeInspection`, `ContributionSnapshot`, and observer event payloads are
+fresh snapshots. Core-owned metadata is copied and frozen, including nested
+diagnostic and blocked-provider records. Contribution values and error causes
+are opaque host/plugin values and are not recursively frozen by core.
 
 ## Error model
 

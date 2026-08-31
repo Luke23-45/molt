@@ -1,3 +1,11 @@
+/**
+ * A general plugin runtime for safe replacement. A plugin is a versioned
+ * capability provider running inside an owned resource scope; replacement is
+ * prepared in isolation and committed only after successful preparation.
+ *
+ * @packageDocumentation
+ */
+
 // Public export surface of @molt/runtime — exactly the list in plan 03 §10.
 // Gate G9 reviews every change here against the reviewed API file.
 // Scope and PluginContext are types consumers receive; core is their only
@@ -21,6 +29,7 @@ export type {
   ProvidedCapability,
   Requirement,
 } from './definition.js';
-export type { DisposalReport, RuntimeErrorCode } from './errors.js';
+export type { DisposalReport, MoltErrorInit, RuntimeErrorCode } from './errors.js';
+export type { BlockedDiagnostic } from './resolver.js';
 export type { Runtime, RuntimeInspection, RuntimeListener, RuntimeOptions } from './runtime.js';
 export type { Scope } from './scope.js';

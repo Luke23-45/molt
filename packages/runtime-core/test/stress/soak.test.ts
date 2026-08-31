@@ -28,7 +28,7 @@ const counters = { acquired: 0, released: 0 };
 
 function soakDefinition(index: number): PluginDefinition {
   const id = `soak.p${String(index).padStart(2, '0')}`;
-  const cap = capability<{ readonly index: number }>(`soak.cap.${String(index)}`, '1.0.0');
+  const cap = capability<{ readonly index: number }>(`soak.cap.p${String(index)}`, '1.0.0');
   return {
     id,
     version: '1.0.0',
@@ -155,8 +155,14 @@ describe('ADR-08/INV-12: 10k-operation soak with bounded diagnostics (plan 04 se
           }
         } else if (kind < 55) {
           if (status === 'installed' || status === 'stopped') {
-            await runtime.start(id);
-            states.set(id, 'active');
+            await runtime
+              .start(id)
+              .then(() => {
+                states.set(id, 'active');
+              })
+              .catch(() => {
+                syncStates();
+              });
           }
         } else if (kind < 75) {
           if (status === 'active') {

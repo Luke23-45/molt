@@ -6,12 +6,12 @@ The value of Molt is failure behavior, so the suite is designed around failure (
 
 Vitest projects defined in the root `vitest.config.ts` (Vitest 4 removed `vitest.workspace.ts`; amendment 00 §9):
 
-| Project | Files | Runs in |
-|---|---|---|
-| `unit` | `test/*.test.ts` | node, happy-dom (both) |
+| Project    | Files                     | Runs in                        |
+| ---------- | ------------------------- | ------------------------------ |
+| `unit`     | `test/*.test.ts`          | node, happy-dom (both)         |
 | `property` | `test/property/*.test.ts` | node (fast-check, seeded runs) |
-| `stress` | `test/stress/*.test.ts` | node |
-| `adapters` | per-adapter packages (P3) | node + happy-dom |
+| `stress`   | `test/stress/*.test.ts`   | node                           |
+| `adapters` | per-adapter packages (P3) | node + happy-dom               |
 
 Every test name references its invariant: `it('INV-07: failed candidate replacement leaves the old generation serving', …)`. A test without an INV or a spec section reference does not get merged.
 
@@ -42,7 +42,7 @@ Every test name references its invariant: `it('INV-07: failed candidate replacem
 5. multi-provider token → all compatible providers, documented order (host first, then id lexicographic)
 6. optional requirement: absent → no edge; incompatible → diagnostic without failure
 7. version ranges: `^1.2.3`, `>=2 <3`, prerelease exclusion — via `internal/semver` (no lexical sort anywhere)
-8. cycle of 2, cycle of 3, self-edge → `DEPENDENCY_CYCLE` with full path each time
+8. cycle of 2 and cycle of 3 → `DEPENDENCY_CYCLE` with full path; self-resolution → `INVALID_DEFINITION`
 9. stopped provider listed as `'stopped'`, never selected
 10. host provider + plugin providing same token → `AMBIGUOUS_PROVIDER` (construction-time for hosts)
 11. reverse edges complete for every selected edge (feeds INV-11/15)
@@ -69,17 +69,17 @@ Every test name references its invariant: `it('INV-07: failed candidate replacem
 
 ### `replacement.test.ts` — the nine transaction gates of note 06, **written first (P0)**
 
-| # | Note-06 blocker | Also proves |
-|---|---|---|
-| T-R1 | setup throws after acquiring three resources → all three disposed | INV-01 |
-| T-R2 | candidate replacement throws → old generation active **and usable** (a call into its capability succeeds during the failed window) | INV-07 |
-| T-R3 | candidate validation fails → zero candidate capabilities/contributions visible | INV-06 |
-| T-R4 | old disposal fails after commit → new generation active, `DISPOSAL_FAILED` inspectable, no restore attempt | INV-08, INV-14 |
-| T-R5 | 100 replacements → resource counters at baseline | INV-12 |
-| T-R6 | dependent stop without cascade → rejected, no state change | INV-11 |
-| T-R7 | provider stop with cascade → dependents first, deterministic order | INV-11 |
-| T-R8 | runtime disposal twice → no duplicate disposer calls, no unhandled rejection | INV-05 |
-| T-R9 | provider replacement with active dependents → rejected with path, zero state change | INV-15 |
+| #    | Note-06 blocker                                                                                                                    | Also proves    |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| T-R1 | setup throws after acquiring three resources → all three disposed                                                                  | INV-01         |
+| T-R2 | candidate replacement throws → old generation active **and usable** (a call into its capability succeeds during the failed window) | INV-07         |
+| T-R3 | candidate validation fails → zero candidate capabilities/contributions visible                                                     | INV-06         |
+| T-R4 | old disposal fails after commit → new generation active, `DISPOSAL_FAILED` inspectable, no restore attempt                         | INV-08, INV-14 |
+| T-R5 | 100 replacements → resource counters at baseline                                                                                   | INV-12         |
+| T-R6 | dependent stop without cascade → rejected, no state change                                                                         | INV-11         |
+| T-R7 | provider stop with cascade → dependents first, deterministic order                                                                 | INV-11         |
+| T-R8 | runtime disposal twice → no duplicate disposer calls, no unhandled rejection                                                       | INV-05         |
+| T-R9 | provider replacement with active dependents → rejected with path, zero state change                                                | INV-15         |
 
 Plus: candidate commit ordering (publish → active → old disposed) asserted by event sequence; `preparing` interrupted by stop → failure, nothing published (INV-06).
 
@@ -98,7 +98,7 @@ Plus: candidate commit ordering (publish → active → old disposed) asserted b
 - `arbFailureInjection`: per-activation failure probability, injected at setup-throw, setup-reject, disposer-throw, and commit-validation points.
 - `arbOperations`: random sequences of `install/start/stop/replace/uninstall/dispose` honoring precondition validity (valid operations only — invalid ones have dedicated unit tests).
 
-**Invariants asserted after *every* operation** (the note-06 list, mechanized):
+**Invariants asserted after _every_ operation** (the note-06 list, mechanized):
 
 ```
 active plugin      → exactly one active generation                    (INV-05's dual)
@@ -120,12 +120,12 @@ disposed generation → owns zero live runtime resources                 (INV-12
 
 ## 5. Environment matrix
 
-| Environment | How | Why |
-|---|---|---|
-| Node 22, Node 24 | CI matrix | engines floor + active LTS ([01 §2](./01-repository-layout.md)) |
-| happy-dom | vitest environment, same unit suite | "browser-like environment" requirement of note 01; proves no Node-specific imports |
-| real browser smoke | Playwright, P3, one happy-path + one replacement test | end-to-end honesty for the React/Vite adapters |
-| Windows + Ubuntu + macOS | CI matrix | path/async edge behavior; a public library cannot be unix-only |
+| Environment              | How                                                   | Why                                                                                |
+| ------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Node 22, Node 24         | CI matrix                                             | engines floor + active LTS ([01 §2](./01-repository-layout.md))                    |
+| happy-dom                | vitest environment, same unit suite                   | "browser-like environment" requirement of note 01; proves no Node-specific imports |
+| real browser smoke       | Playwright, P3, one happy-path + one replacement test | end-to-end honesty for the React/Vite adapters                                     |
+| Windows + Ubuntu + macOS | CI matrix                                             | path/async edge behavior; a public library cannot be unix-only                     |
 
 ## 6. Coverage thresholds
 

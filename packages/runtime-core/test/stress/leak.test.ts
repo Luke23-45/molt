@@ -61,6 +61,7 @@ function providerDefinition(
       if (options?.failSetup === true) {
         throw new Error(`injected candidate failure (generation ${generation})`);
       }
+      context.provide(CAP, { generation });
       return options?.failDispose === true
         ? {
             dispose: () => {

@@ -11,21 +11,22 @@ import { isValidRange, isValidVersion } from './internal/semver.js';
 import type { Scope } from './scope.js';
 
 /**
- * The cleanup contract a plugin may return from `setup` (note 02): adopted
+ * The cleanup contract a plugin may return from setup (note 02): adopted
  * by the generation's scope and run exactly once during disposal (INV-05).
- * `dispose` never throws into the lifecycle — a throw is collected in the
+ * dispose never throws into the lifecycle — a throw is collected in the
  * disposal report (INV-03).
  *
  * @public
  */
 export interface DisposableLike {
-  dispose: () => void | Promise<void>;
+  /** Releases the owned resource; failures are collected by the scope. */
+  readonly dispose: () => void | Promise<void>;
 }
 
 /**
- * Plugin lifecycle status (note 02). `installed → preparing → active →
- * disposing → stopped`; a failed preparation exits to `stopped`. Observed
- * through `Runtime.getStatus` and `Runtime.inspect`.
+ * Plugin lifecycle status (note 02). The sequence is
+ * installed → preparing → active → disposing → stopped; a failed preparation exits
+ * to stopped. Observed through Runtime.getStatus and Runtime.inspect.
  *
  * @public
  */
@@ -33,7 +34,7 @@ export type PluginStatus = 'installed' | 'preparing' | 'active' | 'disposing' | 
 
 /**
  * One declared dependency: a capability token plus the semver range the
- * consumer accepts. `optional: true` requirements resolve to `undefined`
+ * consumer accepts. Optional requirements resolve to undefined
  * when nothing selectable exists instead of failing the start (note 04).
  *
  * @public
@@ -46,7 +47,7 @@ export interface Requirement {
 
 /**
  * One declared provision: a capability token this plugin publishes during
- * `setup`. `multiple` must agree with the token's own provider policy —
+ * setup. multiple must agree with the token's own provider policy —
  * the token is the authority (plan 03 §1).
  *
  * @public
@@ -57,16 +58,16 @@ export interface ProvidedCapability {
 }
 
 /**
- * The per-activation object handed to `setup` (note 02). Everything a
+ * The per-activation object handed to setup (note 02). Everything a
  * plugin touches flows through here — there are no globals (INV-13). The
  * context is live only for this generation; its scope is disposed when the
  * generation stops, is replaced, or fails (INV-01/12).
  *
- * @throws Methods throw structured `MoltError`s: `require`/`optional` for
- * undeclared tokens (`INVALID_STATE`, `details.reason =
- * 'undeclared-requirement'` — INV-09), `provide` for undeclared or
- * duplicated tokens (`ACTIVATION_FAILED`), `contribute` for duplicate ids
- * (`INVALID_DEFINITION`) or post-commit staging (`INVALID_STATE`).
+ * @throws Methods throw structured MoltError values. require and optional use
+ * INVALID_STATE with details.reason = undeclared-requirement for undeclared
+ * tokens (INV-09); provide uses ACTIVATION_FAILED for undeclared or duplicated
+ * tokens; contribute uses INVALID_DEFINITION for duplicate ids and
+ * INVALID_STATE for post-commit staging.
  * @public
  */
 export interface PluginContext {
@@ -84,7 +85,7 @@ export interface PluginContext {
 
 /**
  * One diagnostic entry (note 02). Diagnostics are recorded in the
- * generation's capped log (ADR-08) and are visible through `inspect()` —
+ * generation's capped log (ADR-08) and are visible through inspect —
  * they never replace structured errors (INV-10).
  *
  * @public
@@ -97,7 +98,7 @@ export interface DiagnosticInput {
 
 /**
  * The immutable description of a plugin (note 02). Validated at
- * `install`/`replace` and frozen (ADR-06) — setup must never mutate it.
+ * install/replace and frozen (ADR-06) — setup must never mutate it.
  *
  * @public
  */
@@ -146,8 +147,18 @@ function validateRequirement(
       capabilityId: String(req.capability.id),
     });
   }
+  if (typeof req.capability.multiple !== 'boolean') {
+    return invalid(`requirement ${index} of ${owner} has an invalid provider policy`, {
+      capabilityId: String(req.capability.id),
+    });
+  }
   if (typeof req.range !== 'string' || !isValidRange(req.range)) {
     return invalid(`requirement ${index} of ${owner} has an invalid semver range`, {
+      capabilityId: req.capability.id,
+    });
+  }
+  if (req.optional !== undefined && typeof req.optional !== 'boolean') {
+    return invalid(`requirement ${index} of ${owner} has a non-boolean optional flag`, {
       capabilityId: req.capability.id,
     });
   }
@@ -165,6 +176,11 @@ function validateProvided(provided: unknown, owner: string, index: number): Molt
   }
   if (!isValidRuntimeId(prov.capability.id) || !isValidVersion(prov.capability.version)) {
     return invalid(`provided capability ${index} of ${owner} has an invalid capability token`, {
+      capabilityId: String(prov.capability.id),
+    });
+  }
+  if (typeof prov.capability.multiple !== 'boolean') {
+    return invalid(`provided capability ${index} of ${owner} has an invalid provider policy`, {
       capabilityId: String(prov.capability.id),
     });
   }
@@ -191,14 +207,14 @@ export function validateDefinition(definition: PluginDefinition): MoltError | un
   if (typeof definition.setup !== 'function') {
     return invalid('setup must be a function', { pluginId: owner });
   }
-  const requires: readonly unknown[] = definition.requires ?? [];
-  if (!Array.isArray(requires)) {
+  if (definition.requires !== undefined && !Array.isArray(definition.requires)) {
     return invalid('requires must be an array', { pluginId: owner });
   }
-  const provides: readonly unknown[] = definition.provides ?? [];
-  if (!Array.isArray(provides)) {
+  if (definition.provides !== undefined && !Array.isArray(definition.provides)) {
     return invalid('provides must be an array', { pluginId: owner });
   }
+  const requires: readonly unknown[] = definition.requires ?? [];
+  const provides: readonly unknown[] = definition.provides ?? [];
 
   const requiredIds = new Set<string>();
   let index = 0;
@@ -265,12 +281,14 @@ export function freezeDefinition<T extends PluginDefinition>(definition: T): T {
   if (definition.requires !== undefined) {
     Object.freeze(definition.requires);
     for (const requirement of definition.requires) {
+      Object.freeze(requirement.capability);
       Object.freeze(requirement);
     }
   }
   if (definition.provides !== undefined) {
     Object.freeze(definition.provides);
     for (const provided of definition.provides) {
+      Object.freeze(provided.capability);
       Object.freeze(provided);
     }
   }

@@ -41,6 +41,8 @@ interface ModelSelection {
   readonly capabilityVersion: string;
 }
 
+type ModelProviderSelections = ReadonlyMap<string, readonly ModelSelection[]>;
+
 export class ModelRuntime {
   readonly world: World;
   readonly plugins = new Map<string, ModelPlugin>();
@@ -257,7 +259,12 @@ export class ModelRuntime {
     // Candidate preparation — the old generation keeps serving (INV-07).
     this.counter += 1;
     const candidateId = `${definition.id}#${String(this.counter)}`;
-    const candidateFailure = this.#prepareCandidate(definition, oldGenerationId);
+    const candidateProviders = this.#candidateSelections(definition);
+    const candidateFailure = this.#prepareCandidate(
+      definition,
+      oldGenerationId,
+      candidateProviders,
+    );
     if (candidateFailure !== undefined) {
       record.hasError = true;
       this.events.push({ type: 'failed', pluginId: definition.id });
@@ -267,7 +274,7 @@ export class ModelRuntime {
     // Commit — engine order: candidate consumes recorded from current bindings
     // (the old generation is still published), then withdraw old, then publish
     // the candidate, then swap the record (plan 00 §4.3).
-    const consumes = this.#candidateConsumes(definition);
+    const consumes = this.#candidateConsumes(definition, candidateProviders);
     const oldDisposeThrows = this.genDisposeThrows.get(oldGenerationId) === true;
     this.#withdrawGeneration(oldGenerationId);
     this.#publishCandidate(definition, runTag, candidateId, consumes);
@@ -333,7 +340,7 @@ export class ModelRuntime {
     resolution: {
       readonly ok: true;
       readonly order: readonly string[];
-      readonly providers: ReadonlyMap<string, readonly ModelSelection[]>;
+      readonly providers: ReadonlyMap<string, ModelProviderSelections>;
     },
   ):
     | { readonly ok: true; readonly generationId: string }
@@ -345,9 +352,12 @@ export class ModelRuntime {
 
     // Setup effects, in engine order: acquire → require/optional (serve log) →
     // contribute → provide.
-    this.#predictServes(definition, resolution.providers);
+    this.#predictServes(definition, resolution.providers.get(definition.id) ?? new Map());
 
     const fails: ModelOutcome | undefined = (() => {
+      if (definition.failSetupThrow) {
+        return { ok: false, code: 'ACTIVATION_FAILED' as const };
+      }
       if (definition.failPublish && definition.provides.length > 0) {
         return { ok: false, code: 'ACTIVATION_FAILED' as const };
       }
@@ -401,7 +411,8 @@ export class ModelRuntime {
     // Dependency edges recorded at commit from the plan (plan 00 §4.1 step 8).
     const consumes = new Set<string>();
     for (const requirement of definition.requires) {
-      const selections = resolution.providers.get(requirement.capabilityId) ?? [];
+      const selections =
+        resolution.providers.get(definition.id)?.get(requirement.capabilityId) ?? [];
       for (const selection of selections) {
         if (selection.pluginId === null) {
           continue; // host providers are never stop/replace targets
@@ -434,27 +445,78 @@ export class ModelRuntime {
    * against current published bindings (the old generation serves), conflicts
    * are checked against every generation except the one being replaced.
    */
-  #prepareCandidate(definition: WorldPlugin, oldGenerationId: string): ModelOutcome | undefined {
-    // Serves resolve against CURRENT bindings — host first, then commit order.
+  #candidateSelections(definition: WorldPlugin): ModelProviderSelections {
     const currentProviders = new Map<string, readonly ModelSelection[]>();
     for (const requirement of definition.requires) {
-      const selections: ModelSelection[] = [];
+      const pool: ModelSelection[] = [];
       const cap = this.world.capabilities.find((entry) => entry.id === requirement.capabilityId);
       if (cap?.host === true) {
-        selections.push({ pluginId: null, capabilityVersion: cap.hostVersion });
+        pool.push({ pluginId: null, capabilityVersion: cap.hostVersion });
       }
       const byGeneration = this.published.get(requirement.capabilityId);
       if (byGeneration !== undefined) {
         for (const binding of byGeneration.values()) {
-          selections.push({
+          if (binding.pluginId === definition.id) {
+            // Candidate resolution cannot depend on the old generation it is
+            // replacing; the old binding is withdrawn at commit.
+            continue;
+          }
+          pool.push({
             pluginId: binding.pluginId,
             capabilityVersion: binding.capabilityVersion,
           });
         }
       }
-      currentProviders.set(requirement.capabilityId, selections);
+      const compatible = pool.filter((candidate) =>
+        satisfiesRange(candidate.capabilityVersion, requirement.range),
+      );
+      const ordered = compatible.sort((a, b) => {
+        if (a.pluginId === null) {
+          return b.pluginId === null ? 0 : -1;
+        }
+        if (b.pluginId === null) {
+          return 1;
+        }
+        return a.pluginId < b.pluginId ? -1 : a.pluginId > b.pluginId ? 1 : 0;
+      });
+      currentProviders.set(requirement.capabilityId, ordered);
     }
+    return currentProviders;
+  }
+
+  #prepareCandidate(
+    definition: WorldPlugin,
+    oldGenerationId: string,
+    currentProviders: ModelProviderSelections,
+  ): ModelOutcome | undefined {
+    // Serves resolve against CURRENT compatible bindings — host first, then
+    // plugin id lexicographic (the old generation remains authoritative).
     this.#predictServes(definition, currentProviders);
+
+    if (definition.failSetupThrow) {
+      return { ok: false, code: 'ACTIVATION_FAILED' };
+    }
+
+    for (const requirement of definition.requires) {
+      const selections = currentProviders.get(requirement.capabilityId) ?? [];
+      if (selections.length === 0 && !requirement.optional) {
+        const pool = this.#providerPool(requirement.capabilityId);
+        if (pool.length === 0) {
+          return { ok: false, code: 'MISSING_CAPABILITY' };
+        }
+        return {
+          ok: false,
+          code: pool.some((candidate) =>
+            satisfiesRange(candidate.capabilityVersion, requirement.range),
+          )
+            ? 'MISSING_CAPABILITY'
+            : 'INCOMPATIBLE_CAPABILITY',
+        };
+      }
+      if (selections.length > 1 && !this.policyMultiple(requirement.capabilityId)) {
+        return { ok: false, code: 'AMBIGUOUS_PROVIDER' };
+      }
+    }
 
     if (definition.failPublish && definition.provides.length > 0) {
       return { ok: false, code: 'ACTIVATION_FAILED' };
@@ -491,20 +553,42 @@ export class ModelRuntime {
    * Candidate consumes, computed from current bindings (engine order: the old
    * generation is still published when its successor records its edges).
    */
-  #candidateConsumes(definition: WorldPlugin): Set<string> {
+  #candidateConsumes(
+    definition: WorldPlugin,
+    currentProviders: ModelProviderSelections,
+  ): Set<string> {
     const consumes = new Set<string>();
     for (const requirement of definition.requires) {
+      const selections = currentProviders.get(requirement.capabilityId) ?? [];
       const byGeneration = this.published.get(requirement.capabilityId);
       if (byGeneration === undefined) {
         continue;
       }
-      for (const [providerGenerationId, binding] of byGeneration) {
-        if (binding.pluginId !== null) {
-          consumes.add(providerGenerationId);
+      for (const selection of selections) {
+        if (selection.pluginId === null) {
+          continue;
+        }
+        for (const [providerGenerationId, binding] of byGeneration) {
+          if (binding.pluginId === selection.pluginId) {
+            consumes.add(providerGenerationId);
+            break;
+          }
         }
       }
     }
     return consumes;
+  }
+
+  #providerPool(capabilityId: string): readonly ModelSelection[] {
+    const pool: ModelSelection[] = [];
+    const cap = this.world.capabilities.find((entry) => entry.id === capabilityId);
+    if (cap?.host === true) {
+      pool.push({ pluginId: null, capabilityVersion: cap.hostVersion });
+    }
+    for (const binding of this.published.get(capabilityId)?.values() ?? []) {
+      pool.push({ pluginId: binding.pluginId, capabilityVersion: binding.capabilityVersion });
+    }
+    return pool;
   }
 
   #publishCandidate(
@@ -547,7 +631,7 @@ export class ModelRuntime {
     | {
         readonly ok: true;
         readonly order: readonly string[];
-        readonly providers: ReadonlyMap<string, readonly ModelSelection[]>;
+        readonly providers: ReadonlyMap<string, ModelProviderSelections>;
       }
     | { readonly ok: false; readonly code: RuntimeErrorCode } {
     const byId = new Map<string, WorldPlugin>();
@@ -579,7 +663,7 @@ export class ModelRuntime {
       }
     }
 
-    const selection = new Map<string, readonly ModelSelection[]>();
+    const selection = new Map<string, Map<string, readonly ModelSelection[]>>();
     for (const definition of [...byId.values()].sort((a, b) =>
       a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
     )) {
@@ -620,19 +704,19 @@ export class ModelRuntime {
           }
           return a.pluginId < b.pluginId ? -1 : a.pluginId > b.pluginId ? 1 : 0;
         });
-        selection.set(capabilityId, ordered);
+        let consumerSelection = selection.get(definition.id);
+        if (consumerSelection === undefined) {
+          consumerSelection = new Map<string, readonly ModelSelection[]>();
+          selection.set(definition.id, consumerSelection);
+        }
+        consumerSelection.set(capabilityId, ordered);
       }
     }
 
     // Selected edges only; a global cycle check in sorted-start order.
     const adjacency = new Map<string, string[]>();
-    for (const [capabilityId, selections] of selection) {
-      for (const from of byId.keys()) {
-        if (
-          !byId.get(from)?.requires.some((requirement) => requirement.capabilityId === capabilityId)
-        ) {
-          continue;
-        }
+    for (const [from, consumerSelections] of selection) {
+      for (const selections of consumerSelections.values()) {
         for (const candidate of selections) {
           const to = candidate.pluginId ?? '(host)';
           const list = adjacency.get(from) ?? [];
@@ -788,10 +872,7 @@ export class ModelRuntime {
    * start path and the current-binding list for the candidate path — both are
    * read the same way.
    */
-  #predictServes(
-    definition: WorldPlugin,
-    providers: ReadonlyMap<string, readonly ModelSelection[]>,
-  ): void {
+  #predictServes(definition: WorldPlugin, providers: ModelProviderSelections): void {
     if (!definition.doRequire) {
       return;
     }

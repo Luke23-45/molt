@@ -34,6 +34,7 @@ export type RuntimeErrorCode =
  * @public
  */
 export interface DisposalReport {
+  /** Errors raised by disposers, in the order they were encountered. */
   readonly errors: readonly unknown[];
 }
 
@@ -45,12 +46,19 @@ export interface DisposalReport {
  * @public
  */
 export interface MoltErrorInit {
+  /** Structured runtime error code. */
   readonly code: RuntimeErrorCode;
+  /** Human-readable summary; callers should branch on `code` instead. */
   readonly message: string;
+  /** Plugin identity associated with the failure, when known. */
   readonly pluginId?: string | undefined;
+  /** Generation identity associated with the failure, when known. */
   readonly generation?: string | undefined;
+  /** Capability identity associated with the failure, when known. */
   readonly capabilityId?: string | undefined;
+  /** Dependency or cascade path associated with the failure, when known. */
   readonly path?: readonly string[] | undefined;
+  /** Additional structured metadata for the failure. */
   readonly details?: Readonly<Record<string, unknown>> | undefined;
 }
 
@@ -71,6 +79,34 @@ function buildMessage(init: MoltErrorInit): string {
   }
   const suffix = context.length > 0 ? ` (${context.join(', ')})` : '';
   return `[${init.code}] ${init.message}${suffix}`;
+}
+
+function cloneAndFreeze(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((entry) => cloneAndFreeze(entry)));
+  }
+  if (typeof value === 'object' && value !== null) {
+    if (Object.prototype.toString.call(value) === '[object Object]') {
+      const copy: Record<string, unknown> = {};
+      for (const key of Object.keys(value)) {
+        // Validated boundary: the object tag above limits this copy to record-like data.
+        const entry = (value as Readonly<Record<string, unknown>>)[key];
+        copy[key] = cloneAndFreeze(entry);
+      }
+      return Object.freeze(copy);
+    }
+  }
+  return value;
+}
+
+function immutableDetails(
+  details: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  const cloned = cloneAndFreeze(details);
+  if (typeof cloned !== 'object' || cloned === null || Array.isArray(cloned)) {
+    throw new TypeError('error details must be a record');
+  }
+  return cloned as Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -98,13 +134,14 @@ export class MoltError extends Error {
     this.generation = init.generation;
     this.capabilityId = init.capabilityId;
     this.path = init.path === undefined ? undefined : Object.freeze([...init.path]);
-    this.details = init.details === undefined ? undefined : Object.freeze({ ...init.details });
+    this.details = init.details === undefined ? undefined : immutableDetails(init.details);
     Object.defineProperty(this, BRAND, {
       value: true,
       enumerable: false,
       writable: false,
       configurable: false,
     });
+    Object.freeze(this);
   }
 
   /**

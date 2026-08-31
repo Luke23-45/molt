@@ -32,7 +32,7 @@ export function capability<T>(
 ): Capability<T>;
 ```
 
-**[Decision / ADR-05]** The token declares the provider policy (note 04: "the token must declare that policy"). `ProvidedCapability.multiple` (note 02) remains as a declaration field but is *validated to agree* with the token's policy — disagreement is `INVALID_DEFINITION`. The token is the authority.
+**[Decision / ADR-05]** The token declares the provider policy (note 04: "the token must declare that policy"). `ProvidedCapability.multiple` (note 02) remains as a declaration field but is _validated to agree_ with the token's policy — disagreement is `INVALID_DEFINITION`. The token is the authority.
 
 **[Decision]** ID grammar: `^[a-z][a-z0-9]*(\.[a-z][a-z0-9-]*)*$` — dotted namespaces like `example.clock` are valid; uppercase, leading digits, and empty segments are not. Version must be a valid semver per `internal/semver.valid`. Violations throw `MoltError('INVALID_DEFINITION')` at factory time — capability creation is eager and cheap, so bad tokens fail where they are written, not in resolution.
 
@@ -54,10 +54,9 @@ export interface PluginDefinition {
   readonly version: string;
   readonly requires?: readonly Requirement[];
   readonly provides?: readonly ProvidedCapability[];
-  readonly setup: (context: PluginContext) =>
-    | void
-    | DisposableLike
-    | Promise<void | DisposableLike>;
+  readonly setup: (
+    context: PluginContext,
+  ) => void | DisposableLike | Promise<void | DisposableLike>;
 }
 
 export interface DisposableLike {
@@ -66,17 +65,16 @@ export interface DisposableLike {
 
 export interface Requirement {
   readonly capability: Capability<unknown>;
-  readonly range: string;                 // semver range, validated via internal/semver
+  readonly range: string; // semver range, validated via internal/semver
   readonly optional?: boolean;
 }
 
 export interface ProvidedCapability {
   readonly capability: Capability<unknown>;
-  readonly multiple?: boolean;            // must agree with token policy
+  readonly multiple?: boolean; // must agree with token policy
 }
 
-export type PluginStatus =
-  | 'installed' | 'preparing' | 'active' | 'disposing' | 'stopped';
+export type PluginStatus = 'installed' | 'preparing' | 'active' | 'disposing' | 'stopped';
 ```
 
 ### `validateDefinition(def): MoltError | undefined`
@@ -92,7 +90,7 @@ Checked in this order, each failure returning the named code:
 7. Every provided token's `multiple` agrees with the token policy → `INVALID_DEFINITION`.
 8. A plugin providing a token it also requires → `INVALID_DEFINITION` (self-resolution is rejected per note 04).
 
-`install` and `replace` run `validateDefinition`, then shallow-freeze the definition and every nested array (**[Decision / ADR-06]** — note 02 forbids setup-time mutation of the definition; freezing turns a silent bug into an immediate error).
+`install` and `replace` run `validateDefinition`, then shallow-freeze the definition, capability declaration arrays, declaration entries, and capability tokens (**[Decision / ADR-06]** — note 02 forbids setup-time mutation of the definition; freezing turns a silent bug into an immediate error).
 
 ### Edge cases
 
@@ -134,7 +132,7 @@ export interface DisposalReport {
 ### Behavior
 
 - `cause` is passed via the standard `Error` options bag (`target: es2022` gives native chaining); `MoltError.from` wraps foreign throwables, preserving `cause` chains — a log line is not an API (note 02).
-- `MoltError` never mutates its `details` after construction; `details` values are shallow-frozen.
+- `MoltError` never mutates its `details` after construction; runtime-owned plain records and arrays inside `details` are copied and recursively frozen. Opaque values remain opaque.
 - `message` is deterministic: `"[CODE] human summary (pluginId: …, capabilityId: …)"` — greppable and test-assertable.
 
 ### Edge cases
@@ -152,25 +150,25 @@ export interface DisposalReport {
 ```ts
 export interface Scope {
   readonly signal: AbortSignal;
-  onDispose(disposer: () => void | Promise<void>): void;   // throws INVALID_STATE if disposed
-  acquire<T>(
-    create: () => T | Promise<T>,
-    dispose: (value: T) => void | Promise<void>,
-  ): Promise<T>;                                            // throws INVALID_STATE if disposed (rejects)
+  onDispose(disposer: () => void | Promise<void>): void; // throws INVALID_STATE if disposed
+  acquire<T>(create: () => T | Promise<T>, dispose: (value: T) => void | Promise<void>): Promise<T>; // throws INVALID_STATE if disposed (rejects)
   isDisposed(): boolean;
-  [Symbol.asyncDispose](): Promise<void>;                   // ADR-09
+  [Symbol.asyncDispose](): Promise<void>; // ADR-09
 }
 ```
 
 ### Internal representation
 
 ```ts
-interface Entry { run: () => void | Promise<void>; label?: string }
+interface Entry {
+  run: () => void | Promise<void>;
+  label?: string;
+}
 class ScopeImpl implements Scope {
-  #entries: Entry[];          // LIFO by construction (INV-02)
+  #entries: Entry[]; // LIFO by construction (INV-02)
   #controller: AbortController;
   #disposed = false;
-  #disposedReport?: DisposalReport;   // INV-05: memoized
+  #disposedReport?: DisposalReport; // INV-05: memoized
 }
 ```
 
@@ -178,7 +176,7 @@ class ScopeImpl implements Scope {
 
 `dispose()` sequence, exactly:
 
-1. Set `#disposed = true`; abort `#controller` (in-flight work observes it *before* cleanup begins).
+1. Set `#disposed = true`; abort `#controller` (in-flight work observes it _before_ cleanup begins).
 2. Iterate `#entries` in reverse. For each: invoke the idempotent wrapper; sync throw or rejected promise → append to `errors`; continue (INV-03).
 3. Async entries are awaited in sequence — disposal of one entry completes before the next begins (deterministic teardown; a timeout policy lives in the host adapter layer, per note 03).
 4. Freeze the report, memoize it, return it.
@@ -189,8 +187,8 @@ The idempotent wrapper (`internal/async.ts`) guarantees INV-05 at resource granu
 
 - `acquire` on a disposed scope → rejects `MoltError('INVALID_STATE')` (INV-04).
 - `create` throws → nothing is registered; ownership never attaches to a failed creation (note 02).
-- `create` succeeds *after* abort: the value is disposed immediately and `acquire` rejects — a resource is never left owned by a dead scope (INV-01/12).
-- `create` resolves, `dispose` throws during a *failed activation* → the error is collected in the activation's disposal report and attached to `ACTIVATION_FAILED.details` (INV-01/03).
+- `create` succeeds _after_ abort: the value is disposed immediately and `acquire` rejects — a resource is never left owned by a dead scope (INV-01/12).
+- `create` resolves, `dispose` throws during a _failed activation_ → the error is collected in the activation's disposal report and attached to `ACTIVATION_FAILED.details` (INV-01/03).
 - `onDispose` after dispose → throws `INVALID_STATE` (late registration is a bug, not a no-op).
 - Sync `setup` (non-promise) still registers the returned `DisposableLike` before any validation step — note 02's adoption rule.
 - `dispose()` called concurrently twice → second caller awaits the first's report; disposers run once (INV-05).
@@ -204,20 +202,22 @@ The idempotent wrapper (`internal/async.ts`) guarantees INV-05 at resource granu
 
 ```ts
 interface ResolutionInput {
-  definitions: readonly PluginDefinition[];        // all installed, incl. the candidate
+  definitions: readonly PluginDefinition[]; // all installed, incl. the candidate
   hostProviders: ReadonlyMap<string, ProviderBinding>;
-  replacements?: ReadonlyMap<string, string>;      // pluginId → generationId allowed to shadow
+  replacements?: ReadonlyMap<string, string>; // pluginId → generationId allowed to shadow
 }
 interface ResolutionPlan {
   readonly order: readonly string[];
-  readonly providers: ReadonlyMap<string, string | readonly string[]>;  // capabilityId → provider(s)
+  readonly providers: ReadonlyMap<string, ReadonlyMap<string, readonly ProviderSelection[]>>;
   readonly edges: readonly { from: string; to: string; reason: string }[];
 }
-interface BlockedDiagnostic {                      // feeds inspection (note 04 tree)
+interface BlockedDiagnostic {
+  // feeds inspection (note 04 tree)
   readonly pluginId: string;
   readonly requirement: { capabilityId: string; range: string; optional: boolean };
   readonly candidates: readonly {
-    pluginId: string | null; version: string;
+    pluginId: string | null;
+    version: string;
     verdict: 'incompatible' | 'stopped' | 'ambiguous' | 'ok';
   }[];
 }
@@ -230,14 +230,14 @@ Implements [00 §4.1](./00-system-architecture.md) steps 1–9. Binding decision
 - **Candidate pool** = host providers ∪ definitions declaring a compatible provide. A definition counts as a candidate only if it is `installed`, `active`, or `stopped`-but-startable (a `stopped` provider is listed with verdict `'stopped'` in diagnostics, never silently selected — note 04's diagnostic example).
 - **Version check** = `semver.satisfies(providerVersion, range)` via `internal/semver` (ADR-02). Lexical comparison is forbidden (note 04).
 - **Ordering** — [Decision]: resolution output is fully deterministic under input permutation; tests shuffle input order and assert identical plans. Multi-provider values: host providers first, then plugin providers by id lexicographic (amendment 00 §9).
-- **Cycles** are detected over *selected* edges only (a provider ignored by selection cannot create a cycle). `path` is the full traversal stack at back-edge detection.
+- **Cycles** are detected over _selected_ edges only (a provider ignored by selection cannot create a cycle). `path` is the full traversal stack at back-edge detection.
 - **Deterministic activation order** = topological sort, Kahn's algorithm, ready-set as a sorted structure keyed by plugin id.
 
 ### Edge cases
 
-- Definition requires a capability whose only compatible provider is *itself* → `DEPENDENCY_CYCLE` with path `[self, self]` (self-edges are real cycles).
+- Definition both requires and provides the same capability → `INVALID_DEFINITION`; self-resolution is rejected before graph construction (note 04).
 - Optional requirement with zero candidates → no edge, no diagnostic, `ctx.optional` returns `undefined` (note 04).
-- Optional requirement with *incompatible* candidates → edge omitted; diagnostic entry with verdict `'incompatible'` is still recorded (visibility without failure).
+- Optional requirement with _incompatible_ candidates → edge omitted; diagnostic entry with verdict `'incompatible'` is still recorded (visibility without failure).
 - Two host providers claiming the same capability id → runtime construction fails fast (`AMBIGUOUS_PROVIDER` naming both) — host misconfiguration is a construction error, not a runtime surprise.
 - Empty install table + host providers only → `order: []`, plan valid.
 
@@ -259,18 +259,18 @@ export function contributionKey<T>(id: string): ContributionKey<T>;
 
 ```ts
 class StagedContributions {
-  #staged = new Map<string, unknown>();        // candidate-private (INV-06)
-  #committed: ReadonlyMap<string, unknown>;    // visible snapshot
-  stage(key, value): void;     // duplicate id in same generation → MoltError INVALID_DEFINITION
-  commit(): ReadonlyMap<string, unknown>;      // once per generation (INV-04)
+  #staged = new Map<string, unknown>(); // candidate-private (INV-06)
+  #committed: ReadonlyMap<string, unknown>; // visible snapshot
+  stage(key, value): void; // duplicate id in same generation → MoltError INVALID_DEFINITION
+  commit(): ReadonlyMap<string, unknown>; // once per generation (INV-04)
 }
 ```
 
 ### Behavior
 
 - Values are opaque to core (note 02): core never inspects shape, only key uniqueness.
-- Commit swaps the snapshot atomically; the previous generation's set is withdrawn by the runtime *after* the new snapshot is published (ordering fixed by note 03's replacement diagram).
-- Contribution ids are global across the runtime; a candidate that stages an id owned by an *unrelated* active generation fails validation (note 03 step 7). Shadowing the generation being replaced is allowed — that is the point of replacement.
+- Commit swaps the snapshot atomically; the previous generation's set is withdrawn by the runtime _after_ the new snapshot is published (ordering fixed by note 03's replacement diagram).
+- Contribution ids are global across the runtime; a candidate that stages an id owned by an _unrelated_ active generation fails validation (note 03 step 7). Shadowing the generation being replaced is allowed — that is the point of replacement.
 
 ### Edge cases
 
@@ -306,14 +306,14 @@ The lifecycle engine. Public API is exactly note 02's `Runtime`, `RuntimeOptions
 
 ### State transition table (binding)
 
-| From \ Event | `start(id)` | `stop(id)` | `replace(def)` | `uninstall(id)` |
-|---|---|---|---|---|
-| `installed` | → preparing | `INVALID_STATE` | `INVALID_STATE` | ok (removed) |
-| `preparing` | queued | queued | queued | queued |
-| `active` | `INVALID_STATE` | → disposing → stopped | replacement protocol | `INVALID_STATE` (stop first) |
-| `disposing` | queued | queued (no-op) | queued | queued |
-| `stopped` | → preparing | no-op | replacement protocol | ok (removed; persisted data untouched — README rule) |
-| not installed | `INVALID_STATE` (see decision below) | `INVALID_STATE` | `INVALID_STATE` (note 02: replace needs an installed id) | `INVALID_STATE` |
+| From \ Event  | `start(id)`                          | `stop(id)`            | `replace(def)`                                           | `uninstall(id)`                                      |
+| ------------- | ------------------------------------ | --------------------- | -------------------------------------------------------- | ---------------------------------------------------- |
+| `installed`   | → preparing                          | `INVALID_STATE`       | `INVALID_STATE`                                          | ok (removed)                                         |
+| `preparing`   | queued                               | queued                | queued                                                   | queued                                               |
+| `active`      | `INVALID_STATE`                      | → disposing → stopped | replacement protocol                                     | `INVALID_STATE` (stop first)                         |
+| `disposing`   | queued                               | queued (no-op)        | queued                                                   | queued                                               |
+| `stopped`     | → preparing                          | no-op                 | replacement protocol                                     | ok (removed; persisted data untouched — README rule) |
+| not installed | `INVALID_STATE` (see decision below) | `INVALID_STATE`       | `INVALID_STATE` (note 02: replace needs an installed id) | `INVALID_STATE`                                      |
 
 `start` of a never-installed id throws `INVALID_STATE` with `details.reason = 'not-installed'` **[Decision]** — `MISSING_CAPABILITY` is reserved for capability resolution failures (note 02), not plugin identity.
 
@@ -333,17 +333,17 @@ Provider startup uses the internal activation path (ADR-04): the consumer's acti
 
 Implements [00 §4.3](./00-system-architecture.md) exactly. Additional binding decisions:
 
-- Pre-validation of the candidate (`validateDefinition` + declared-capability diff against the old generation's provides) runs *before* any scope is created — a version regression on a provided capability fails without touching the old generation (note 02: "validate … before preparing its candidate generation").
+- Pre-validation of the candidate (`validateDefinition`, candidate resolution, and static provider-conflict checks) runs _before_ any scope is created — a version regression on a provided capability fails without touching the old generation (note 02: "validate … before preparing its candidate generation").
 - Dependent check (INV-15 v1 = reject): if the resolution plan shows active dependents on any capability the old generation provides and the candidate does not provide compatibly, throw `REPLACEMENT_FAILED` with `path` = dependent chain. **No rebinding.**
-- Commit ordering is fixed: publish candidate snapshot → mark candidate active → *then* dispose old scope. Old-scope disposal runs even if the host never awaits it; its report becomes a `DISPOSAL_FAILED` diagnostic (INV-14), never a rollback (INV-08).
+- Candidate resolution or preparation failures are wrapped as `REPLACEMENT_FAILED` with the structured underlying failure as `cause`; old-scope disposal runs after commit and its report becomes a `DISPOSAL_FAILED` diagnostic (INV-14), never a rollback (INV-08).
 
 ### Stop / cascade / uninstall
 
-Per [00 §4.4](./00-system-architecture.md). `uninstall` rules (note 04): active plugin → `INVALID_STATE` (stop first); dependents of a *stopped-but-installed* plugin are irrelevant to uninstall; uninstall never touches persistence (README rule — there is no persistence in core, so this invariant is structural: core has no API to delete anything but runtime state).
+Per [00 §4.4](./00-system-architecture.md). `uninstall` rules (note 04): active plugin → `INVALID_STATE` (stop first); dependents of a _stopped-but-installed_ plugin are irrelevant to uninstall; uninstall never touches persistence (README rule — there is no persistence in core, so this invariant is structural: core has no API to delete anything but runtime state).
 
 ### Runtime disposal
 
-`runtime.dispose()`: reject new operations with `INVALID_STATE`; stop all active generations in reverse activation order; await all scope reports; aggregate a final `DISPOSAL_FAILED` diagnostics list. Idempotent (INV-05, note 06 transaction test 8).
+`runtime.dispose()`: reject new operations with `INVALID_STATE`; stop all active generations in reverse activation order; await all scope reports; aggregate a final `DISPOSAL_FAILED` diagnostics list; emit one terminal `disposed` event after teardown. It does not emit per-plugin `stopped` events. Idempotent (INV-05, note 06 transaction test 8).
 
 ### Observer bus
 
@@ -368,23 +368,29 @@ Per [00 §4.4](./00-system-architecture.md). `uninstall` rules (note 04): active
 ```ts
 export interface RuntimeInspection {
   readonly plugins: readonly {
-    id: string; status: PluginStatus; generation?: string; error?: unknown;
-    blockedBy?: readonly BlockedDiagnostic;   // present iff start failed on resolution
+    id: string;
+    status: PluginStatus;
+    generation?: string;
+    error?: unknown;
+    blockedBy?: readonly BlockedDiagnostic; // present iff start failed on resolution
     diagnostics?: readonly DiagnosticInput[]; // generation's capped log (ADR-08), iff committed
   }[];
   readonly capabilities: readonly {
-    id: string; provider: string; version: string;
+    id: string;
+    provider: string;
+    version: string;
   }[];
   readonly observerDiagnostics: readonly {
-    message: string; cause: unknown;
-  }[];                                        // capped listener-throw log (ADR-08)
+    message: string;
+    cause: unknown;
+  }[]; // capped listener-throw log (ADR-08)
 }
 ```
 
 ### Behavior
 
-- `inspect()` returns a fresh frozen snapshot; mutating it cannot affect the runtime (note 03: immutable snapshots).
-- The blocked-plugin tree of note 04 (`example.consumer cannot start └─ requires storage >= 2.0.0 …`) is a *renderer* over `BlockedDiagnostic`; the renderer lives in inspection, the data lives in the resolver — the diagnostic contract is data, not text.
+- `inspect()` returns a fresh frozen snapshot; runtime-owned records, arrays, and diagnostic metadata are copied and recursively frozen, so mutating a returned snapshot cannot affect the runtime (note 03: immutable snapshots). Opaque values and throwable causes are not deep-frozen.
+- The blocked-plugin tree of note 04 (`example.consumer cannot start └─ requires storage >= 2.0.0 …`) is a _renderer_ over `BlockedDiagnostic`; the renderer lives in inspection, the data lives in the resolver — the diagnostic contract is data, not text.
 - `capabilities` lists committed generations and host providers only (INV-06); staged entries never appear.
 
 ### Diagnostics visibility (amendment — forced by the stress suite)
@@ -393,7 +399,7 @@ ADR-08 caps the diagnostic logs, but a cap nobody can observe is unverifiable: p
 
 ### Edge cases
 
-- Inspection during `preparing` shows the *old* generation (or none) — candidates are invisible until commit (INV-06).
+- Inspection during `preparing` shows the _old_ generation (or none) — candidates are invisible until commit (INV-06).
 - After INV-14 failure, the new generation is listed with its `DISPOSAL_FAILED` diagnostic attached — the failure is inspectable, not merely logged.
 
 ---
@@ -415,11 +421,26 @@ contributionKey;
 MoltError;
 isMoltError;
 // types
-Runtime, RuntimeOptions, RuntimeListener, RuntimeInspection,
-PluginDefinition, PluginContext, PluginStatus,
-Capability, Requirement, ProvidedCapability,
-ContributionKey, ContributionSnapshot, ContributionEntry, DiagnosticInput,
-Scope, DisposableLike, DisposalReport, RuntimeErrorCode
+(Runtime,
+  RuntimeOptions,
+  RuntimeListener,
+  RuntimeInspection,
+  PluginDefinition,
+  PluginContext,
+  PluginStatus,
+  Capability,
+  Requirement,
+  ProvidedCapability,
+  ContributionKey,
+  ContributionSnapshot,
+  ContributionEntry,
+  DiagnosticInput,
+  Scope,
+  DisposableLike,
+  DisposalReport,
+  RuntimeErrorCode,
+  MoltErrorInit,
+  BlockedDiagnostic);
 ```
 
-`Scope` and `PluginContext` are exported as *types consumers receive*; they are constructed only by core. Nothing from `internal/` is exported; the `exports` map makes that structurally true ([01 §4](./01-repository-layout.md)).
+`Scope` and `PluginContext` are exported as _types consumers receive_; they are constructed only by core. Nothing from `internal/` is exported; the `exports` map makes that structurally true ([01 §4](./01-repository-layout.md)).

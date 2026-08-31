@@ -19,8 +19,13 @@ import type { DisposalReport } from './errors.js';
 import { isMoltError, MoltError } from './errors.js';
 import { buildInspection } from './inspection.js';
 import { BoundedLog, OperationQueue } from './internal/async.js';
-import type { BlockedDiagnostic, HostProvider, ResolutionPlan } from './resolver.js';
-import { resolve } from './resolver.js';
+import type {
+  BlockedDiagnostic,
+  CandidateProvider,
+  HostProvider,
+  ResolutionPlan,
+} from './resolver.js';
+import { resolve, resolveCandidate } from './resolver.js';
 import { ScopeImpl } from './scope.js';
 
 /**
@@ -174,10 +179,6 @@ interface RequirementLike {
   readonly capability: Capability<unknown>;
   readonly range: string;
   readonly optional?: boolean | undefined;
-}
-
-interface Selection {
-  readonly pluginId: string | null;
 }
 
 class RuntimeImpl implements Runtime {
@@ -340,6 +341,12 @@ class RuntimeImpl implements Runtime {
       return this.#disposedPromise; // idempotent (INV-05, note 06 T-R8)
     }
     this.#disposed = true;
+    // Abort every in-flight preparation synchronously. The preparation may
+    // still resume later, but its commit-time guard below makes an aborted or
+    // disposed generation permanently unpublishable (INV-04/06).
+    for (const preparing of this.#preparing.values()) {
+      void preparing.scope.dispose();
+    }
     const run = async (): Promise<void> => {
       // Reverse activation order (plan 00 §4.6).
       for (const generationId of [...this.#activationOrder].reverse()) {
@@ -527,7 +534,16 @@ class RuntimeImpl implements Runtime {
       if (adoptable(returned)) {
         // Note 02: a returned disposer is adopted before any validation or
         // commit step — cleaned up on validation failure too.
-        scope.onDispose(() => returned.dispose());
+        await adoptReturnedDisposer(scope, returned);
+      }
+      if (this.#disposed || scope.isDisposed()) {
+        throw new MoltError({
+          code: 'INVALID_STATE',
+          message: 'runtime was disposed during activation',
+          pluginId,
+          generation: generationId,
+          details: { reason: 'runtime-disposed' },
+        });
       }
       // 6: declared provides must have been published (note 02).
       for (const provided of definition.provides ?? []) {
@@ -577,6 +593,15 @@ class RuntimeImpl implements Runtime {
       // (INV-11/15 depend on complete edges, plan 00 §4.1 step 8).
       this.#recordResolvedProviders(definition, generation, plan);
       // 8: atomic commit — the INV-06 boundary.
+      if (this.#disposed || scope.isDisposed()) {
+        throw new MoltError({
+          code: 'INVALID_STATE',
+          message: 'runtime was disposed before activation commit',
+          pluginId,
+          generation: generationId,
+          details: { reason: 'runtime-disposed' },
+        });
+      }
       record.status = 'active';
       record.generation = generation;
       record.error = undefined;
@@ -664,6 +689,32 @@ class RuntimeImpl implements Runtime {
       });
     }
 
+    try {
+      this.#validateReplacementClaims(frozen, old);
+    } catch (error) {
+      record.error = this.#replacementFailure(error, definition.id);
+      this.#emit({ type: 'failed', pluginId: definition.id, error: record.error });
+      throw record.error;
+    }
+
+    let candidatePlan: ResolutionPlan;
+    try {
+      const providers: CandidateProvider[] = [];
+      for (const host of this.#hostProviders.values()) {
+        providers.push({ pluginId: null, capability: host.capability });
+      }
+      for (const byGeneration of this.#published.values()) {
+        for (const binding of byGeneration.values()) {
+          providers.push({ pluginId: binding.pluginId, capability: binding.capability });
+        }
+      }
+      candidatePlan = resolveCandidate({ definition: frozen, providers });
+    } catch (error) {
+      record.error = this.#replacementFailure(error, definition.id);
+      this.#emit({ type: 'failed', pluginId: definition.id, error: record.error });
+      throw record.error;
+    }
+
     // Candidate preparation — the old generation stays authoritative and
     // serving throughout (INV-07); record.status is untouched until commit.
     this.#generationCounter += 1;
@@ -681,14 +732,24 @@ class RuntimeImpl implements Runtime {
       providedTokenIds: [],
       diagnostics: new BoundedLog<DiagnosticInput>(DIAGNOSTIC_CAPACITY),
     };
+    this.#preparing.set(definition.id, candidate);
     const staged = new StagedContributions(definition.id, generationId);
     const stagedProvides = new Map<string, { capability: Capability<unknown>; value: unknown }>();
-    const context = this.#buildContext(frozen, candidate, staged, stagedProvides, undefined);
+    const context = this.#buildContext(frozen, candidate, staged, stagedProvides, candidatePlan);
 
     try {
       const returned = await frozen.setup(context);
       if (adoptable(returned)) {
-        scope.onDispose(() => returned.dispose());
+        await adoptReturnedDisposer(scope, returned);
+      }
+      if (this.#disposed || scope.isDisposed()) {
+        throw new MoltError({
+          code: 'INVALID_STATE',
+          message: 'runtime was disposed during replacement preparation',
+          pluginId: definition.id,
+          generation: generationId,
+          details: { reason: 'runtime-disposed' },
+        });
       }
       for (const provided of frozen.provides ?? []) {
         if (!stagedProvides.has(provided.capability.id)) {
@@ -745,21 +806,30 @@ class RuntimeImpl implements Runtime {
     } catch (error) {
       // Candidate failed: dispose it fully, keep the old generation (INV-07).
       const report = await scope.dispose();
-      record.error = new MoltError(
-        {
-          code: 'REPLACEMENT_FAILED',
-          message: `candidate replacement of ${definition.id} failed`,
-          pluginId: definition.id,
-          generation: generationId,
-          details: report.errors.length > 0 ? { disposalErrors: report.errors } : undefined,
-        },
-        error,
-      );
+      this.#preparing.delete(definition.id);
+      record.error = this.#replacementFailure(error, definition.id, generationId, report.errors);
       this.#emit({ type: 'failed', pluginId: definition.id, error: record.error });
       throw record.error;
     }
 
-    this.#recordResolvedProviders(frozen, candidate, undefined);
+    this.#recordResolvedProviders(frozen, candidate, candidatePlan);
+    if (this.#disposed || scope.isDisposed()) {
+      const report = await scope.dispose();
+      record.error = this.#replacementFailure(
+        new MoltError({
+          code: 'INVALID_STATE',
+          message: 'runtime was disposed before replacement commit',
+          pluginId: definition.id,
+          generation: generationId,
+          details: { reason: 'runtime-disposed' },
+        }),
+        definition.id,
+        generationId,
+        report.errors,
+      );
+      this.#preparing.delete(definition.id);
+      throw record.error;
+    }
     // Commit (INV-06 boundary): withdraw old, publish candidate, swap the
     // generation, emit replaced — and only then dispose the old scope. The
     // protocol resolves after that disposal attempt completes (plan 00 §4.3).
@@ -798,6 +868,7 @@ class RuntimeImpl implements Runtime {
       // the old generation is never restored (INV-08).
       record.error = this.#disposalFailure(old, report);
     }
+    this.#preparing.delete(definition.id);
   }
 
   // -- stop / cascade -------------------------------------------------------------
@@ -905,12 +976,61 @@ class RuntimeImpl implements Runtime {
 
   // -- helpers -----------------------------------------------------------------------
 
+  #validateReplacementClaims(definition: PluginDefinition, old: Generation): void {
+    for (const provided of definition.provides ?? []) {
+      if (provided.capability.multiple) {
+        continue;
+      }
+      if (this.#hostProviders.has(provided.capability.id)) {
+        throw new MoltError({
+          code: 'AMBIGUOUS_PROVIDER',
+          message: `a host provider already claims ${provided.capability.id}`,
+          pluginId: definition.id,
+          capabilityId: provided.capability.id,
+        });
+      }
+      const byGeneration = this.#published.get(provided.capability.id);
+      if (byGeneration === undefined) {
+        continue;
+      }
+      for (const generationId of byGeneration.keys()) {
+        if (generationId !== old.id) {
+          throw new MoltError({
+            code: 'AMBIGUOUS_PROVIDER',
+            message: `capability ${provided.capability.id} is already published by another active generation`,
+            pluginId: definition.id,
+            capabilityId: provided.capability.id,
+          });
+        }
+      }
+    }
+  }
+
+  #replacementFailure(
+    error: unknown,
+    pluginId: string,
+    generation?: string,
+    disposalErrors: readonly unknown[] = [],
+  ): MoltError {
+    const details = disposalErrors.length > 0 ? { disposalErrors } : undefined;
+    return new MoltError(
+      {
+        code: 'REPLACEMENT_FAILED',
+        message: `candidate replacement of ${pluginId} failed`,
+        pluginId,
+        ...(generation !== undefined ? { generation } : {}),
+        ...(details !== undefined ? { details } : {}),
+      },
+      error,
+    );
+  }
+
   #buildContext(
     definition: PluginDefinition,
     generation: Generation,
     staged: StagedContributions,
     stagedProvides: Map<string, { capability: Capability<unknown>; value: unknown }>,
-    plan: ResolutionPlan | undefined,
+    plan: ResolutionPlan,
   ): PluginContext {
     const pluginId = generation.pluginId;
     const generationId = generation.id;
@@ -989,7 +1109,7 @@ class RuntimeImpl implements Runtime {
         staged.stage(key, value);
       },
       diagnose: (input: DiagnosticInput): void => {
-        generation.diagnostics.push(input);
+        generation.diagnostics.push(snapshotDiagnosticInput(input));
       },
     };
   }
@@ -1002,14 +1122,11 @@ class RuntimeImpl implements Runtime {
   #recordResolvedProviders(
     definition: PluginDefinition,
     generation: Generation,
-    plan: ResolutionPlan | undefined,
+    plan: ResolutionPlan,
   ): void {
     for (const requirement of definition.requires ?? []) {
       const capabilityId = requirement.capability.id;
-      const selections =
-        plan === undefined
-          ? this.#currentSelections(capabilityId)
-          : (plan.providers.get(capabilityId) ?? []);
+      const selections = plan.providers.get(definition.id)?.get(capabilityId) ?? [];
       for (const selection of selections) {
         if (selection.pluginId === null) {
           continue; // host providers are never stop/replace targets
@@ -1041,17 +1158,6 @@ class RuntimeImpl implements Runtime {
     providers.add(providerGenerationId);
   }
 
-  #currentSelections(capabilityId: string): readonly { pluginId: string | null }[] {
-    const selections: { pluginId: string | null }[] = [];
-    const byGeneration = this.#published.get(capabilityId);
-    if (byGeneration !== undefined) {
-      for (const binding of byGeneration.values()) {
-        selections.push({ pluginId: binding.pluginId });
-      }
-    }
-    return selections;
-  }
-
   /**
    * Resolves one declared requirement to its value (INV-09). Multi-provider
    * tokens yield every selected provider in documented order; providers are
@@ -1061,34 +1167,13 @@ class RuntimeImpl implements Runtime {
     requirement: RequirementLike,
     token: Capability<unknown>,
     generation: Generation,
-    plan: ResolutionPlan | undefined,
+    plan: ResolutionPlan,
   ): unknown {
     const capabilityId = token.id;
-    let selections: readonly Selection[];
-    if (plan !== undefined) {
-      const fromPlan = plan.providers.get(capabilityId);
-      if (fromPlan === undefined) {
-        selections = [];
-      } else {
-        selections = fromPlan;
-      }
-    } else {
-      // Replacement candidates resolve against current active bindings —
-      // the old generation keeps serving during preparation (INV-07).
-      const current: Selection[] = [];
-      if (this.#hostProviders.has(capabilityId)) {
-        current.push({ pluginId: null });
-      }
-      const byGeneration = this.#published.get(capabilityId);
-      if (byGeneration !== undefined) {
-        for (const binding of byGeneration.values()) {
-          current.push({ pluginId: binding.pluginId });
-        }
-      }
-      selections = current;
-    }
+    const fromPlan = plan.providers.get(generation.pluginId)?.get(capabilityId);
+    const resolvedSelections = fromPlan ?? [];
 
-    if (selections.length === 0) {
+    if (resolvedSelections.length === 0) {
       if (requirement.optional === true) {
         return undefined; // optional with nothing selected (plan 03 §5)
       }
@@ -1106,7 +1191,7 @@ class RuntimeImpl implements Runtime {
       // Each provider publishes a collection; the consumer receives the
       // concatenation in documented order (note 04).
       const values: unknown[] = [];
-      for (const selection of selections) {
+      for (const selection of resolvedSelections) {
         const resolved = this.#bindingFor(capabilityId, selection.pluginId, generation);
         if (!Array.isArray(resolved.value)) {
           throw new MoltError({
@@ -1125,7 +1210,7 @@ class RuntimeImpl implements Runtime {
       }
       return Object.freeze(values);
     }
-    const first = selections[0];
+    const first = resolvedSelections[0];
     if (first === undefined) {
       throw new MoltError({
         code: 'INVALID_STATE',
@@ -1311,10 +1396,12 @@ class RuntimeImpl implements Runtime {
         } catch (error) {
           // Observer failures never propagate into lifecycle outcomes
           // (plan 03 §7); they become bounded diagnostics.
-          this.#observerDiagnostics.push({
-            message: `observer threw during ${String(event.type)}`,
-            cause: error,
-          });
+          this.#observerDiagnostics.push(
+            Object.freeze({
+              message: `observer threw during ${String(event.type)}`,
+              cause: error,
+            }),
+          );
         }
       }
     } finally {
@@ -1329,8 +1416,70 @@ function adoptable(returned: void | DisposableLike): returned is DisposableLike 
   );
 }
 
+async function adoptReturnedDisposer(scope: ScopeImpl, returned: DisposableLike): Promise<void> {
+  if (scope.isDisposed()) {
+    // The runtime may abort a preparation while setup is suspended. A
+    // disposer returned after that point still owns cleanup responsibility
+    // and must run exactly once (INV-01/05/12).
+    await returned.dispose();
+    return;
+  }
+  scope.onDispose(() => returned.dispose());
+}
+
+function snapshotDiagnosticInput(input: DiagnosticInput): DiagnosticInput {
+  const details = input.details;
+  return Object.freeze({
+    message: input.message,
+    ...(input.severity !== undefined ? { severity: input.severity } : {}),
+    ...(details !== undefined ? { details: cloneDiagnosticDetails(details) } : {}),
+  });
+}
+
+function cloneDiagnosticDetails(
+  details: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  const cloned = cloneDiagnosticValue(details);
+  // Validated boundary: DiagnosticInput.details is a record; the clone keeps
+  // that shape while isolating nested plain objects and arrays.
+  return cloned as Readonly<Record<string, unknown>>;
+}
+
+function cloneDiagnosticValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((entry) => cloneDiagnosticValue(entry)));
+  }
+  if (typeof value === 'object' && value !== null) {
+    if (Object.prototype.toString.call(value) === '[object Object]') {
+      const copy: Record<string, unknown> = {};
+      for (const key of Object.keys(value)) {
+        // Validated boundary: the object tag above limits this copy to record-like data.
+        const entry = (value as Readonly<Record<string, unknown>>)[key];
+        copy[key] = cloneDiagnosticValue(entry);
+      }
+      return Object.freeze(copy);
+    }
+  }
+  return value;
+}
+
 function activationError(error: unknown, pluginId: string, generationId: string): MoltError {
   if (isMoltError(error)) {
+    if (
+      error.code === 'INVALID_STATE' &&
+      (error.details?.['reason'] === 'runtime-disposed' ||
+        error.details?.['reason'] === 'preparation-aborted')
+    ) {
+      return new MoltError(
+        {
+          code: 'ACTIVATION_FAILED',
+          message: `setup was interrupted for ${pluginId}`,
+          pluginId,
+          generation: generationId,
+        },
+        error,
+      );
+    }
     // Structured errors thrown by provide/contribute already carry identity.
     return error;
   }

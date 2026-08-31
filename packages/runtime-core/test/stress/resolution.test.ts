@@ -54,6 +54,7 @@ function buildGraph(): LayerPlugin[] {
 }
 
 function toDefinition(plugin: LayerPlugin): PluginDefinition {
+  const providedCapability = capability(plugin.capabilityId, '1.0.0');
   const requires = plugin.requires.map((capabilityId) => ({
     capability: capability(capabilityId, '1.0.0'),
     range: '^1.0.0',
@@ -62,8 +63,10 @@ function toDefinition(plugin: LayerPlugin): PluginDefinition {
     id: plugin.id,
     version: '1.0.0',
     ...(requires.length > 0 ? { requires } : {}),
-    provides: [{ capability: capability(plugin.capabilityId, '1.0.0') }],
-    setup: () => undefined,
+    provides: [{ capability: providedCapability }],
+    setup: (context) => {
+      context.provide(providedCapability, { pluginId: plugin.id });
+    },
   };
 }
 
@@ -137,7 +140,11 @@ describe('resolution budget (plan 04 sec 4)', () => {
                   released += 1;
                 },
               )
-              .then(() => undefined);
+              .then(() => {
+                context.provide(capability(plugin.capabilityId, '1.0.0'), {
+                  pluginId: plugin.id,
+                });
+              });
           },
         });
       }
@@ -164,7 +171,7 @@ describe('resolution budget (plan 04 sec 4)', () => {
       expect(activeCount).toBe(TOTAL);
 
       await runtime.dispose();
-      expect(released).toBe(TOTAL); // every acquired resource released (INV-12)
+      expect(released).toBe(graph.length); // root acquires no resource (INV-12)
       expect(runtime.inspect().plugins.every((plugin) => plugin.status === 'stopped')).toBe(true);
     },
   );

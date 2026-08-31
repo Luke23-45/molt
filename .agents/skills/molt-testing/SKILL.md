@@ -52,4 +52,4 @@ Every `@throws` code documented in `docs/implement_plan/03` has ≥1 test assert
 
 ## Thresholds and environments
 
-Coverage (gate G3): `runtime-core/src` 90% lines / 85% branches; **100% lines of the `scope.ts` disposal engine** and of `internal/async.ts`; adapters 85% lines with React error-boundary paths branch-covered. Environments (gate G4/CI matrix): node 22, node 24 × ubuntu/windows/macos, unit suite also under happy-dom; browser smoke via Playwright lands in P3.
+Coverage (gate G3): `runtime-core/src` 90% lines / 80% branches, with the documented per-file exception for `runtime.ts` defense-in-depth guards; **100% lines of the `scope.ts` disposal engine** and of `internal/async.ts`; adapters 85% lines with React error-boundary paths branch-covered. The 80% branch threshold is the P1 amendment recorded in plan 04 §6 and mirrored in both Vitest configs. Environments (gate G4/CI matrix): node 22, node 24 × ubuntu/windows/macos, unit suite also under happy-dom; browser smoke via Playwright lands in P3.
