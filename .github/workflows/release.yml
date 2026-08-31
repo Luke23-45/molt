@@ -1,0 +1,179 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run the release-plan and tarball publication dry run'
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: release gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: static gates (G1, G2, G5)
+        run: pnpm verify
+      - name: unit and DOM tests (G3)
+        run: pnpm test:coverage
+      - name: happy-dom unit axis (G3)
+        run: pnpm test:dom
+      - name: property and stress tests (G4)
+        run: pnpm test:property
+        env:
+          FC_SEED: '20260831'
+      - name: random property and stress tests (G4)
+        run: pnpm test:property && pnpm test:stress
+      - name: adapter and host tests
+        run: pnpm test:adapters
+      - name: browser smoke
+        run: pnpm --filter @molt/browser-smoke exec playwright install --with-deps chromium; pnpm test:browser
+      - name: architecture, package, and API gates (G6, G7, G9)
+        run: pnpm check:arch && pnpm check:pkg && pnpm check:api
+      - name: regenerate benchmark evidence (G10)
+        run: pnpm bench
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-benchmark-evidence
+          path: demo/comparison/
+
+  dry-run:
+    name: changesets dry run
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: calculate release plan
+        run: pnpm changeset status --verbose
+      - name: create ephemeral snapshot versions
+        run: pnpm changeset version --snapshot release-dry-run
+      - name: rebuild snapshot packages
+        run: pnpm build
+      - name: recheck snapshot package metadata
+        run: pnpm check:pkg
+      - name: simulate npm publication without upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          pack_dir="$RUNNER_TEMP/molt-release-dry-run"
+          mkdir -p "$pack_dir"
+          for package_dir in packages/*; do
+            pnpm --dir "$package_dir" pack --pack-destination "$pack_dir"
+            pnpm --dir "$package_dir" publish --dry-run --no-git-checks --tag dry-run --access public
+          done
+          test "$(find "$pack_dir" -name '*.tgz' | wc -l)" -eq 6
+
+  version:
+    name: version pull request
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: create or update version pull request
+        uses: changesets/action/version@8488615a623b1b9c987934bb89eae8af6a946ac1
+        with:
+          github-token: ${{ github.token }}
+          script: pnpm changeset version
+          commit-message: 'chore: version packages'
+          pr-title: 'chore: version packages'
+
+  release-state:
+    name: verify versioned release commit
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      ready: ${{ steps.state.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: state
+        name: require consumed changesets and nonzero versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const pending = fs.readdirSync('.changeset').some(
+            (entry) => entry.endsWith('.md') && entry !== 'README.md',
+          );
+          const packageDirs = fs.readdirSync('packages', { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => path.join('packages', entry.name));
+          const versions = packageDirs.map((directory) => {
+            const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8'));
+            return { name: manifest.name, version: manifest.version };
+          });
+          const publishable = versions.filter(({ name }) => name.startsWith('@molt/'));
+          const ready = !pending && publishable.every(({ version }) => version !== '0.0.0');
+          console.log(JSON.stringify({ pending, publishable, ready }));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `ready=${ready}\n`);
+          NODE
+
+  publish:
+    name: publish packages
+    needs: [validate, version, release-state]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-state.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      NPM_CONFIG_PROVENANCE: 'true'
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - name: publish with npm trusted publishing
+        uses: changesets/action/publish@8488615a623b1b9c987934bb89eae8af6a946ac1
+        with:
+          github-token: ${{ github.token }}
+          script: pnpm changeset publish
+          create-github-releases: true
+          push-git-tags: true

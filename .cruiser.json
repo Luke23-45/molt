@@ -38,11 +38,11 @@
     {
       "name": "examples-use-core-only",
       "severity": "error",
-      "comment": "Note 07 Phase 2: the two example hosts share the core package, not application code.",
+      "comment": "Note 07 Phase 2: the two example hosts share only the core and public test kit, not application code.",
       "from": { "path": "^examples/" },
       "to": {
         "path": "^packages/",
-        "pathNot": "^packages/runtime-core/"
+        "pathNot": "^packages/(runtime-core|test)/"
       }
     }
   ],

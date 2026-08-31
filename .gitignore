@@ -12,10 +12,13 @@ results/
 
 # demo artifacts (RESULTS.md is committed; raw runs are not)
 demo/*/bench-results/
+demo/*/test-results/
 
 # api-extractor scratch output
 temp/
 etc/api-temp/
+**/temp/
+**/etc/api-temp/
 
 # tooling
 .eslintcache
@@ -23,3 +26,4 @@ etc/api-temp/
 # OS
 .DS_Store
 Thumbs.db
+docs/dev

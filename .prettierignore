@@ -1,4 +1,6 @@
 pnpm-lock.yaml
-dist/
+**/dist/
 **/coverage/
+**/etc/api-temp/
+**/temp/
 node_modules/

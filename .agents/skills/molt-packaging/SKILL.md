@@ -43,4 +43,4 @@ The public surface of `@molt/runtime` is the exact list in `docs/implement_plan/
 
 ## Publish decision (P5)
 
-Publication is gated on the six evidence items of `docs/implement_plan/06` §4 — core green, two hosts + Sky, regenerated benchmarks, documented limitations, zero invariant failures, and the "why a simple registry is insufficient" demo. Missing any item means the release does not happen. Keeping Molt internal is a valid outcome (note 06), and saying so plainly in the ledger is the correct move if the evidence is not there.
+Publication is gated on the six evidence items of `docs/implement_plan/06` §4 — core green, two independent hosts, regenerated benchmarks, documented limitations, zero invariant failures, and the "why a simple registry is insufficient" demo. Missing any item means the release does not happen. Keeping Molt internal is a valid outcome (note 06), and saying so plainly in the ledger is the correct move if the evidence is not there.

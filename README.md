@@ -13,7 +13,7 @@ leaves the old shell intact.
 
 ## The problem it solves
 
-Every plugin system can *start* and *stop* plugins. Almost none can *replace*
+Every plugin system can _start_ and _stop_ plugins. Almost none can _replace_
 one safely. Swapping a live plugin for a new version of it — a new dependency
 bundle, a hot-reloaded module, an upgraded driver — is a transaction: the new
 version must be prepared without disturbing the old one, committed only if
@@ -26,19 +26,33 @@ invariants (INV-01…INV-15, [`docs/implement_plan/00`](docs/implement_plan/00-s
 each proven by tests, including nine transaction gates written before the
 implementation existed:
 
-| Guarantee | Statement |
-|---|---|
-| Failed replacement | A candidate whose setup fails is disposed completely; the old generation stays active **and usable** (INV-01/07) |
-| Atomic commit | Staged capabilities and contributions are invisible until commit; after commit there is no rollback — ever (INV-06/08) |
-| Owned resources | Every resource belongs to a scope; disposal runs LIFO, survives disposer failures, and leaves zero live resources (INV-02/03/12) |
-| Dependents | Stopping a provider with active dependents is rejected unless cascade is explicit, ordered, and recorded (INV-11) |
-| Structured failures | Every failure is a `MoltError` with a stable code — never a warning, never a log line (INV-10) |
-| No globals | Runtime instances share nothing; resolution is deterministic and order-independent (INV-13) |
+| Guarantee           | Statement                                                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Failed replacement  | A candidate whose setup fails is disposed completely; the old generation stays active **and usable** (INV-01/07)                 |
+| Atomic commit       | Staged capabilities and contributions are invisible until commit; after commit there is no rollback — ever (INV-06/08)           |
+| Owned resources     | Every resource belongs to a scope; disposal runs LIFO, survives disposer failures, and leaves zero live resources (INV-02/03/12) |
+| Dependents          | Stopping a provider with active dependents is rejected unless cascade is explicit, ordered, and recorded (INV-11)                |
+| Structured failures | Every failure is a `MoltError` with a stable code — never a warning, never a log line (INV-10)                                   |
+| No globals          | Runtime instances share nothing; resolution is deterministic and order-independent (INV-13)                                      |
+
+## Why a simple registry is not enough
+
+A registry that replaces the current value as soon as setup begins cannot
+preserve a working generation when the replacement fails:
+
+```ts
+registry.set('storage', await next.setup()); // the old value is already lost
+```
+
+Molt prepares `next` in an isolated generation, publishes only after complete
+validation, and disposes the previous generation after commit. The measured
+comparison, including naive-registry and Cordis rows, is in
+[`demo/comparison/RESULTS.md`](demo/comparison/RESULTS.md).
 
 ## Non-goals
 
 - **Not a sandbox.** Plugins are trusted code; Molt governs lifecycle and
-  capability *visibility*, not permissions.
+  capability _visibility_, not permissions.
 - **Not an effect system.** No algebraic effects, no managed runtime — plugins
   are ordinary async functions with a scope.
 - **Not a loader or bundler.** You hand Molt definitions; how they were
@@ -50,8 +64,8 @@ implementation existed:
 ## Why not …
 
 **…Effect?** Effect is a programming model — it replaces how you write
-application logic. Molt is a lifecycle kernel — it governs how *plugins as
-units of deployment* start, compose, and get replaced. They compose; they do
+application logic. Molt is a lifecycle kernel — it governs how _plugins as
+units of deployment_ start, compose, and get replaced. They compose; they do
 not compete.
 
 **…TC39 `using` / `DisposableStack`?** Explicit resource management scopes a
@@ -69,10 +83,14 @@ attempts.
 
 ## Packages
 
-| Package | Status |
-|---|---|
-| [`@molt/runtime`](packages/runtime-core/README.md) | The core runtime. Implemented; not yet released. |
-| `@molt/test`, `@molt/events`, `@molt/react`, `@molt/vite`, `@molt/sqlite` | Planned (phases P2–P3 in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md)). |
+| Package                                            | Status                                                                       |
+| -------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [`@molt/runtime`](packages/runtime-core/README.md) | The core runtime. Implemented; not yet released.                             |
+| [`@molt/test`](packages/test/README.md)            | Implemented support package for ownership, replacement, and leak assertions. |
+| [`@molt/events`](packages/events/README.md)        | Implemented typed, generation-scoped event capability.                       |
+| [`@molt/react`](packages/react/README.md)          | Implemented committed-snapshot React adapter.                                |
+| [`@molt/vite`](packages/vite/README.md)            | Implemented host-neutral Vite HMR lifecycle bridge.                          |
+| [`@molt/sqlite`](packages/sqlite/README.md)        | Implemented backend-neutral migration/checksum adapter; internal-first.      |
 
 ## Development
 
@@ -83,10 +101,18 @@ pnpm test                     # unit suite (node + happy-dom)
 pnpm test:coverage            # unit suite with coverage thresholds
 pnpm test:property            # fast-check property suite (model-based)
 pnpm test:stress              # stress suite (1k definitions, replace-100×, soak)
+pnpm test:adapters             # P2 hosts and P3 adapter failure suites
+pnpm test:browser              # Playwright browser smoke (Chromium required)
+pnpm bench                     # naive registry vs Cordis vs Molt evidence
 pnpm check:pkg                # publint + arethetypeswrong
 pnpm check:arch               # dependency-cruiser core-purity rules
 pnpm check:api                # api-extractor diff vs the reviewed API file
+pnpm release:dry-run          # Changesets plan + no-upload package publish simulation
 ```
+
+Comparison results are regenerated by `pnpm bench` in [`demo/comparison/RESULTS.md`](demo/comparison/RESULTS.md).
+The publication gates and one-time npm/GitHub setup are documented in
+[`docs/release-readiness.md`](docs/release-readiness.md).
 
 ## Contributing
 

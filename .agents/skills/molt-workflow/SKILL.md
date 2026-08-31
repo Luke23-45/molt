@@ -4,7 +4,7 @@ description: The Molt development workflow — ledger ticking rules, the four-pa
 license: MIT
 metadata:
   author: moltjs
-  version: "1.0"
+  version: '1.0'
 ---
 
 # Molt workflow
@@ -60,5 +60,5 @@ pnpm bench         # comparison demo (demo changes)
 
 - Core phase (P1) adds no database, UI, event bus, loader, or HMR bridge — note 07 forbids it, and adapter code in core is a gate-G6 violation, not a shortcut.
 - Adapters (P3) use the core lifecycle API only — building a parallel lifecycle in an adapter is a rejected PR.
-- Sky integration (P4) happens only after core is stable, per note 07; the compatibility layer is marked transitional.
+- Sky integration is a separate downstream project and is out of scope for this repository; no Molt P4 implementation is planned.
 - Publication (P5) is a checklist execution, not a vibe — the six evidence items in `docs/implement_plan/06` §4 gate it.

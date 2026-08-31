@@ -1,9 +1,8 @@
 # Gate wiring: docs/implement_plan/06-ci-release-and-governance.md §1.
 # Gates G1–G10 are defined in docs/implement_plan/02-tooling-and-quality-gates.md §3.
 #
-# Bootstrap note: the demo stage still runs with continue-on-error — its
-# marker names the ledger item (P3-6) that removes it. Every other stage
-# runs for real: the enabling items (P1-E7/E8/E10/E11) have landed.
+# The adapter, browser, and release-branch benchmark stages are real gates;
+# their ledger items remain formally open until this workflow runs remotely.
 name: verify
 
 on:
@@ -113,6 +112,37 @@ jobs:
       - name: bun smoke run (G8, ADR-13)
         run: bun -e "import('@molt/runtime').then((m) => { if (!m) process.exit(1); })"
 
+  adapters:
+    # P2/P3 adapter and unrelated-host replacement/leak suites.
+    name: adapters and example hosts (P2/P3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test:adapters
+
+  browser:
+    # P3-7 real-browser replacement smoke.
+    name: browser smoke (P3-7)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm --filter @molt/browser-smoke exec playwright install --with-deps chromium
+      - run: pnpm test:browser
+
   api:
     # G9 API review diff.
     name: api review (G9)
@@ -130,10 +160,8 @@ jobs:
 
   demo:
     # G10 — benchmarks regenerate on release branches only (plan 06 §1).
-    # bootstrap: the comparison demo arrives at P3-6 — remove continue-on-error there
     name: bench artifact (G10)
     if: startsWith(github.ref, 'refs/heads/release') || startsWith(github.ref, 'refs/tags/')
-    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -143,6 +171,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - run: pnpm bench
       - uses: actions/upload-artifact@v4
         with:

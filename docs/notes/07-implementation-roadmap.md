@@ -57,17 +57,16 @@ Each adapter must use the core lifecycle API rather than creating a parallel lif
 
 Exit gate: adapter failures preserve core invariants.
 
-## Phase 4 — Sky integration
+## Phase 4 — Sky integration (out of scope for this repository)
 
-Only after the core is stable:
+Sky integration is intentionally not a Molt repository deliverable. This
+repository ends its implementation roadmap after the host-independent adapters
+and proof artifacts in Phase 3. No Sky inventory, bridge, UI migration,
+database migration, or registry removal is planned here.
 
-- create a thin bridge from Sky plugins to the new definition format;
-- move Sky UI registration behind the React adapter;
-- move database access behind a database capability;
-- remove the current global plugin registry from the library path;
-- keep Sky-specific manifests and application policy in Sky.
-
-Sky may continue using a compatibility layer temporarily, but the compatibility layer must be marked transitional.
+If a downstream Sky project later adopts Molt, that work belongs to the Sky
+project and must define its own transitional compatibility boundary and
+validation plan.
 
 ## Phase 5 — Publication review
 
@@ -104,4 +103,3 @@ packages/runtime-core/test/
 ```
 
 The current Sky files should not be copied into this package as the initial implementation. They are application evidence and migration input, not a clean core boundary.
-

@@ -38,5 +38,5 @@ These are hard rules. A pull request that violates any of them is rejected regar
 | P1    | `runtime-core` only                                        | All unit, transaction, and property tests green; gates G1–G9 green              |
 | P2    | Test kit (`@molt/test`) + two unrelated example hosts      | Replacement and leak tests pass in both examples                                |
 | P3    | Adapters one at a time: events → React → Vite → SQLite     | Each adapter's failures preserve core invariants                                |
-| P4    | Sky integration behind the adapters                        | Sky runs on Molt with the transitional layer marked as such                     |
+| P4    | Out of scope for this repository                           | No Molt-repository implementation task; downstream Sky work is separate         |
 | P5    | Publication review against the thesis                      | Every item in the publish-evidence list exists; else the library stays internal |

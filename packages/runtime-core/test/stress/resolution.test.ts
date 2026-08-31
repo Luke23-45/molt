@@ -100,8 +100,12 @@ describe('resolution budget (plan 04 sec 4)', () => {
       const allDefinitions = [...definitions, root];
       statuses.set(root.id, 'installed');
 
+      const input = { definitions: allDefinitions, statuses, hostProviders, root: root.id };
+      // Warm the pure resolver once so the budget measures steady-state plan
+      // construction rather than one-time module/JIT initialization.
+      resolve(input);
       const firstStart = performance.now();
-      const plan = resolve({ definitions: allDefinitions, statuses, hostProviders, root: root.id });
+      const plan = resolve(input);
       const elapsed = performance.now() - firstStart;
 
       expect(elapsed).toBeLessThan(100); // loose ceiling — a quadratic regression trips it
@@ -109,12 +113,7 @@ describe('resolution budget (plan 04 sec 4)', () => {
       expect(plan.order[plan.order.length - 1]).toBe(root.id); // root activates last
 
       // Determinism: the identical input produces the identical plan.
-      const second = resolve({
-        definitions: allDefinitions,
-        statuses,
-        hostProviders,
-        root: root.id,
-      });
+      const second = resolve(input);
       expect(second.order).toEqual(plan.order);
       expect(second.edges).toEqual(plan.edges);
     },

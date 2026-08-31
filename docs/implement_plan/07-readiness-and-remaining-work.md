@@ -8,18 +8,18 @@ Review date: 2026-08-31. The review covered the source tree, design notes 01–0
 
 The current worktree already contains user changes in `packages/runtime-core/test/property/resolver.test.ts` and `packages/runtime-core/test/toolchain.test.ts`; those changes are preserved.
 
-| Area                 | Result                                | Meaning                                                                                                   |
-| -------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `pnpm verify`        | Green                                 | Typecheck, lint, and knip pass for the current tree.                                                      |
-| `pnpm test`          | Green: 290 tests                      | Unit, DOM, and transaction tests pass.                                                                      |
-| `pnpm test:coverage` | Green: 91.51% lines / 80.46% branches | Package-local thresholds pass; property and stress suites are separately green below.                     |
-| `pnpm check:arch`    | Green                                 | Current dependency-cruiser rules pass.                                                                    |
-| `pnpm build`         | Green                                 | Dual ESM/CJS build succeeds.                                                                              |
-| `pnpm check:pkg`     | Green                                 | `publint` and `attw` pass.                                                                                |
-| `pnpm check:api`     | Green, warning-free                  | API report matches the built public declarations; the surface was manually checked against plan 03 §10. |
-| `pnpm test:property` | Green after correction                | The resolver oracle and lifecycle model were corrected, then rerun with fixed and random seeds.           |
-| `pnpm test:stress`   | Green: 3 files / 4 tests              | Resolution budget, leak, replacement-failure, and bounded-soak checks pass.                               |
-| Remote CI / P0-A1    | Blocked externally                    | GitHub organization/repository creation, first push, and branch protection require the owner’s browser.   |
+| Area                 | Result                                | Meaning                                                                                                 |
+| -------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `pnpm verify`        | Green                                 | Typecheck, lint, and knip pass for the current tree.                                                    |
+| `pnpm test`          | Green: 290 tests                      | Unit, DOM, and transaction tests pass.                                                                  |
+| `pnpm test:coverage` | Green: 91.51% lines / 80.46% branches | Package-local thresholds pass; property and stress suites are separately green below.                   |
+| `pnpm check:arch`    | Green                                 | Current dependency-cruiser rules pass.                                                                  |
+| `pnpm build`         | Green                                 | Dual ESM/CJS build succeeds.                                                                            |
+| `pnpm check:pkg`     | Green                                 | `publint` and `attw` pass.                                                                              |
+| `pnpm check:api`     | Green, warning-free                   | API report matches the built public declarations; the surface was manually checked against plan 03 §10. |
+| `pnpm test:property` | Green after correction                | The resolver oracle and lifecycle model were corrected, then rerun with fixed and random seeds.         |
+| `pnpm test:stress`   | Green: 3 files / 4 tests              | Resolution budget, leak, replacement-failure, and bounded-soak checks pass.                             |
+| Remote CI / P0-A1    | Blocked externally                    | GitHub organization/repository creation, first push, and branch protection require the owner’s browser. |
 
 ## Release blockers found
 
@@ -126,27 +126,34 @@ Do not tick P1-E7, P1-E8, P1-E9, or P1-E11 merely because the suites or wiring e
 
 ## P2–P5 implementation roadmap after P1
 
-### P2 — test kit and independent hosts
+### P2 — test kit and independent hosts — implemented
 
-Build `@molt/test` first: fake resources, cue-based failures, leak assertions, generation disposal assertions, and a plugin harness. Then create `examples/command-host` and `examples/worker-host` using independent application code. Run the same replacement, cascade, disposal, and leak suite against both hosts. Add mutation testing only after the deterministic suite is stable.
+`@molt/test` now provides fake listener/timer/connection resources, deterministic create/dispose failure cues, leak assertions, generation-disposal assertions, and a public-API plugin harness. `examples/command-host` and `examples/worker-host` use independent application code and each runs replacement and leak tests.
 
 Exit condition: both hosts demonstrate the core guarantees without importing one another or relying on shared application globals.
 
-### P3 — adapters and evidence
+### P3 — adapters and evidence — implemented locally
 
-Implement and gate one adapter at a time: `@molt/events`, `@molt/react`, `@molt/vite`, then `@molt/sqlite`. Each adapter needs an explicit mapping from adapter failure to core error/event behavior, scope-owned cleanup, stale-generation protection, and forced-failure tests using `@molt/test`.
+The four adapters are implemented and have forced-failure tests: scoped typed events, committed React snapshots/error isolation/stale callback guards, a host-neutral HMR bridge, and checksum-verified SQLite migrations with explicit host destruction. Their package-local tests run without core-internal imports.
 
-After the adapters, build `demo/comparison` with naive registry, pinned Cordis, and Molt runners. `pnpm bench` must regenerate both `RESULTS.md` and machine-readable JSON. Add the Playwright happy/replacement smoke and the release-branch benchmark artifact job. The root README currently links to comparison results that do not yet exist; the link is only valid after this deliverable lands.
+`demo/comparison` now runs naive-registry, pinned Cordis `4.0.0-rc.9`, and Molt runners; `pnpm bench` regenerates `RESULTS.md` and machine-readable JSON. The Playwright happy/replacement smoke and release-branch benchmark artifact job are wired. The Cordis row intentionally uses its direct dispose-then-activate baseline because its direct Fiber API does not provide Molt's transactional replacement primitive.
 
-### P4 — Sky integration
+### P4 — Sky integration — out of scope
 
-Begin with a source inventory of the current Sky plugin registry, UI registration path, and database ownership boundary. That inventory is required before assigning exact bridge files: this repository currently contains the Molt runtime but not the Sky implementation. Build a thin transitional bridge, route UI through `@molt/react`, route database access through `database.connection`, then remove the global registry from the library path. Mark the compatibility layer transitional in code and documentation.
-
-Exit condition: Sky runs on Molt while manifests, policy, and host-owned concerns remain in Sky.
+Sky integration is intentionally removed from this repository's remaining
+work. This repository does not contain the Sky implementation and will not
+inventory or migrate it. A downstream Sky project may consume Molt later, but
+that bridge, UI/database migration, registry replacement, and transitional
+compatibility policy are outside this project's scope.
 
 ### P5 — publication
 
-Before publishing, add and dry-run the changesets release pipeline, trusted publishing/provenance, and `release.yml`. Complete the evidence checklist only after P1–P4 are green: published core gates, two unrelated hosts, Sky integration, regenerated comparison results, documented limitations, and zero invariant failures or an explicitly reviewed waiver. A publication decision to remain internal is valid if the evidence is not sufficient.
+The Changesets configuration, initial release changeset, trusted-publishing
+workflow, non-publishing dry run, evidence checklist, and positioning review
+are implemented in [`docs/release-readiness.md`](../release-readiness.md).
+Publication remains a separate P5 decision based on the two independent hosts,
+regenerated benchmark evidence, documented limitations, and the full release
+gates. A publication decision to remain internal is valid.
 
 ## Definition of Done for the remaining work
 
