@@ -87,7 +87,7 @@ jobs:
             pnpm --dir "$package_dir" pack --pack-destination "$pack_dir"
             pnpm --dir "$package_dir" publish --dry-run --no-git-checks --tag dry-run --access public
           done
-          test "$(find "$pack_dir" -name '*.tgz' | wc -l)" -eq 6
+          test "$(find "$pack_dir" -name '*.tgz' | wc -l)" -eq 5
 
   version:
     name: version pull request

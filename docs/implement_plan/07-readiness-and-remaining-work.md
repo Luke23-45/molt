@@ -134,7 +134,7 @@ Exit condition: both hosts demonstrate the core guarantees without importing one
 
 ### P3 — adapters and evidence — implemented locally
 
-The four adapters are implemented and have forced-failure tests: scoped typed events, committed React snapshots/error isolation/stale callback guards, a host-neutral HMR bridge, and checksum-verified SQLite migrations with explicit host destruction. Their package-local tests run without core-internal imports.
+The three adapters are implemented and have forced-failure tests: scoped typed events, committed React snapshots/error isolation/stale callback guards, and a host-neutral HMR bridge. Their package-local tests run without core-internal imports. Persistence remains host-owned; no database package is part of the public adapters.
 
 `demo/comparison` now runs naive-registry, pinned Cordis `4.0.0-rc.9`, and Molt runners; `pnpm bench` regenerates `RESULTS.md` and machine-readable JSON. The Playwright happy/replacement smoke and release-branch benchmark artifact job are wired. The Cordis row intentionally uses its direct dispose-then-activate baseline because its direct Fiber API does not provide Molt's transactional replacement primitive.
 

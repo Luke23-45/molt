@@ -4,7 +4,6 @@
 '@molt/events': minor
 '@molt/react': minor
 '@molt/vite': minor
-'@molt/sqlite': minor
 ---
 
 Initial public release of the Molt runtime, public ownership test kit, and

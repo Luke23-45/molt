@@ -25,7 +25,7 @@ docs/
   notes/01…08              # DESIGN: thesis, boundaries, guarantees, positioning — decided
   implement_plan/00…06     # EXECUTION: architecture, layout, gates, specs, tests — binding
   implement_plan/ledger.md # TRACKER: every deliverable as a checkable item
-packages/                  # runtime-core, test, events, react, vite, sqlite (created per phase)
+packages/                  # runtime-core, test, events, react, vite (created per phase)
 examples/                  # command-host, worker-host (P2)
 demo/comparison/           # three-way demo: naive registry vs Cordis vs Molt (P3)
 ```

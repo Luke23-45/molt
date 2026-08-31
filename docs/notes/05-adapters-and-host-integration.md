@@ -10,7 +10,6 @@ packages/
   runtime-events/     # optional typed event capability
   runtime-react/      # React contributions and error boundaries
   runtime-vite/       # Vite HMR bridge
-  runtime-sqlite/     # database capability and migration adapter
   runtime-test/       # fake host capabilities and leak assertions
 ```
 
@@ -19,7 +18,6 @@ The exact package names are not final; published names use the `@molt` scope (se
 ```text
 host application ─┬─ runtime-react
                   ├─ runtime-vite
-                  ├─ runtime-sqlite
                   └─ runtime-core
 ```
 
@@ -33,7 +31,6 @@ Every package must state the problem it solves. This is a publication gate, not 
 | `runtime-react` → `@molt/react` | Plugin UI unmounts exactly when its generation is disposed, with per-contribution error isolation. | Adapter; publishes with the core. |
 | `runtime-vite` → `@molt/vite` | A failed module update keeps the old generation running instead of half-swapping it. | Adapter; also the headline demo of the replacement protocol. |
 | `runtime-events` → `@molt/events` | Typed event subscriptions that disappear with their generation. | Not standalone: mitt or RxJS solve events alone. Ships only as a demonstration of scoped subscriptions. |
-| `runtime-sqlite` → `@molt/sqlite` | Typed database capability with owner and checksum migration records; stopping a plugin never rolls back applied schema. | Internal first; publishes only when a second consumer exists. |
 | `runtime-test` → `@molt/test` | Fake host resources with leak counters, so replacement and leak invariants are assertable in any host. | Support package; ships with the core, not a product on its own. |
 
 The adapters exist to prove the core, not to be products. If `runtime-core` does not demonstrate stronger failure behavior than a naive registry, no adapter changes that.
@@ -66,22 +63,6 @@ Required behavior:
 - HMR errors are reported through runtime diagnostics.
 
 Vite's module graph and `import.meta.hot` are not visible to core.
-
-## Database adapter
-
-The database adapter exposes a typed capability such as `database.connection` and optionally a migration service. The core does not know SQL, tables, WASM, IndexedDB, or snapshot formats.
-
-Migration rules:
-
-- migrations are ordered, immutable records;
-- each migration has an owner and checksum;
-- applying a migration is transactional within the database engine;
-- a changed checksum is a hard error, not a silent rerun;
-- plugin stop/uninstall does not roll back schema changes;
-- destructive data removal requires an explicit host operation and backup policy;
-- persistence failures are surfaced as errors and diagnostics.
-
-This prevents the incorrect assumption that plugin lifecycle rollback can undo an already-applied database schema change.
 
 ## Event adapter
 

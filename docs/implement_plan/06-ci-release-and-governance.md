@@ -32,7 +32,7 @@ Rules: `concurrency` cancels superseded runs; required status checks mirror this
    package tags and GitHub Releases.
 
 The manual `workflow_dispatch` dry run calculates the release plan, creates
-ephemeral snapshot versions, rebuilds and repacks all six public packages,
+ephemeral snapshot versions, rebuilds and repacks all five public packages,
 and runs `pnpm publish --dry-run` without uploading to npm. Benchmark output
 is uploaded as a release artifact for review; it is not silently committed by
 CI because benchmark values are host-dependent. The committed baseline is

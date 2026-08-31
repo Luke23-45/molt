@@ -1,6 +1,6 @@
 # 05 — Adapter Specifications
 
-Adapters depend on core; core knows nothing about them (note [05](../notes/05-adapters-and-host-integration.md)). Every adapter exists because its charter in note [05](../notes/05-adapters-and-host-integration.md) states a problem the core alone cannot solve. Order of construction follows note [07](../notes/07-implementation-roadmap.md) Phase 3, except the test kit, which is Phase 2 and comes first.
+Adapters depend on core; core knows nothing about them (note [05](../notes/05-adapters-and-host-integration.md)). Every adapter exists because its charter in note [05](../notes/05-adapters-and-host-integration.md) states a problem the core alone cannot solve. Order of construction follows note [07](../notes/07-implementation-roadmap.md) Phase 3, except the test kit, which is Phase 2 and comes first. Persistence is host-owned; no database package is part of the public adapters.
 
 ## 1. `@molt/test` — the test kit (P2)
 
@@ -89,19 +89,6 @@ export function useContributions<T>(key: ContributionKey<T>): readonly T[];
 - a changed *provider* triggers dependent revalidation through `replace`'s dependent path (INV-15 behavior is core's, not the bridge's).
 - `import.meta.hot`, Vite's module graph, and Vite types are invisible to core (charter; gate G6).
 
-## 5. `@molt/sqlite` — database adapter (P3, internal-first per charter)
+## 5. Adapter gate
 
-**Problem it solves:** typed database capability with owner-and-checksum migration records; stopping a plugin never rolls back applied schema (charter, note [05](../notes/05-adapters-and-host-integration.md)).
-
-### Behavior requirements
-
-- exposes `database.connection` as a capability; the core never learns SQL, WASM, or IndexedDB (charter).
-- migrations are ordered, immutable records with `owner` (plugin id) and `checksum` (sha-256 of the migration body).
-- applying a migration is transactional within the engine; a changed checksum is a hard error (`MoltError('INVALID_STATE', details.reason = 'checksum-mismatch')`) — never a silent rerun (charter).
-- plugin stop/uninstall does not roll back schema — the adapter's disposal closes connections only; the charter's "persistence ≠ lifecycle" rule is enforced by there being no rollback code at all.
-- destructive data removal requires an explicit host operation, exposed as a separate host-only API with a backup policy hook — not reachable from plugin code.
-- persistence failures surface as errors and diagnostics; nothing is swallowed (charter).
-
-## 6. Adapter gate
-
-Every adapter (P3 exit gate, note 07) passes the same final check: **force a failure in the adapter and assert core invariants hold** — React component error, Vite update failure, migration checksum mismatch, subscriber-throws — each followed by `expectNoLeaks()` and the invariant assertions of [04 §3](./04-test-plan.md). Adapters may be rewritten; the invariants may not bend.
+Every adapter (P3 exit gate, note 07) passes the same final check: **force a failure in the adapter and assert core invariants hold** — React component error, Vite update failure, subscriber-throws — each followed by `expectNoLeaks()` and the invariant assertions of [04 §3](./04-test-plan.md). Adapters may be rewritten; the invariants may not bend.

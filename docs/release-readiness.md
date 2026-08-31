@@ -36,7 +36,7 @@ the npm organization, and a GitHub-hosted release run.
 
 The `workflow_dispatch` dry run is intentionally non-publishing. It calculates
 the release plan, creates ephemeral snapshot versions in the runner, rebuilds
-and checks all public packages, and runs `pnpm publish --dry-run` against six
+and checks all public packages, and runs `pnpm publish --dry-run` against five
 package tarballs. It never requests an npm publish token and never creates a
 dist-tag.
 
@@ -47,7 +47,7 @@ These actions cannot be completed by repository files alone:
 1. Make `Luke23-45/molt` public. npm provenance requires a public repository
    and public packages.
 2. Create or claim the `@molt` npm organization, then configure each of the
-   six publishable packages for public access.
+   five publishable packages for public access.
 3. On npm, configure a GitHub Actions trusted publisher for each package with:
    - GitHub owner: `Luke23-45`
    - repository: `molt`

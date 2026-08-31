@@ -17,8 +17,7 @@ moltjs/
 │   ├── test/                 # @molt/test           (P2)
 │   ├── events/               # @molt/events         (P3)
 │   ├── react/                # @molt/react          (P3)
-│   ├── vite/                 # @molt/vite           (P3)
-│   └── sqlite/               # @molt/sqlite         (P3, internal-first)
+│   └── vite/                 # @molt/vite           (P3)
 ├── examples/
 │   ├── command-host/         # unrelated host #1    (P2)
 │   └── worker-host/          # unrelated host #2    (P2)

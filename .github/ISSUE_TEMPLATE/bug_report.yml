@@ -29,7 +29,7 @@ body:
       options:
         - runtime-core (lifecycle / replacement / disposal)
         - runtime-core (capability resolution / diagnostics)
-        - an adapter (events / react / vite / sqlite)
+        - an adapter (events / react / vite)
         - packaging / installation
         - documentation
     validations:

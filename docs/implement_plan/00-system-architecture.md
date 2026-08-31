@@ -9,8 +9,7 @@ host application
 │
 ├── @molt/react     ─┐
 ├── @molt/vite       ├── adapters (Phase 3) — depend on core, never the reverse
-├── @molt/events     │
-├── @molt/sqlite    ─┘
+├── @molt/events     ─┘
 │
 └── @molt/runtime   ── runtime-core, no host, no UI, no database imports
       │

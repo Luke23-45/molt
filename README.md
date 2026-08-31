@@ -90,7 +90,6 @@ attempts.
 | [`@molt/events`](packages/events/README.md)        | Implemented typed, generation-scoped event capability.                       |
 | [`@molt/react`](packages/react/README.md)          | Implemented committed-snapshot React adapter.                                |
 | [`@molt/vite`](packages/vite/README.md)            | Implemented host-neutral Vite HMR lifecycle bridge.                          |
-| [`@molt/sqlite`](packages/sqlite/README.md)        | Implemented backend-neutral migration/checksum adapter; internal-first.      |
 
 ## Development
 

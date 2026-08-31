@@ -1,6 +1,6 @@
 # 7. Implementation Roadmap
 
-This roadmap intentionally delays React, SQLite, package loading, and HMR. The core must prove its semantics before adapters add complexity.
+This roadmap intentionally delays React, package loading, and HMR. The core must prove its semantics before adapters add complexity.
 
 ## Phase 0 — Decision record
 
@@ -50,8 +50,7 @@ Add adapters one at a time:
 
 1. typed event capability;
 2. React contribution adapter;
-3. Vite HMR adapter;
-4. database/persistence adapter.
+3. Vite HMR adapter.
 
 Each adapter must use the core lifecycle API rather than creating a parallel lifecycle implementation.
 
