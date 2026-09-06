@@ -110,7 +110,17 @@ jobs:
       - name: bun smoke (G8, ADR-13)
         uses: oven-sh/setup-bun@v2
       - name: bun smoke run (G8, ADR-13)
-        run: bun -e "import('@molt/runtime').then((m) => { if (!m) process.exit(1); })"
+        # Import the packed tarball from a plain npm-installed tree: the
+        # workspace link resolves through pnpm symlinks, which is not what
+        # consumers install (and `bun -e` does not resolve it reliably).
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="$(mktemp -d)"
+          cd "$smoke_dir"
+          npm init -y >/dev/null
+          npm install /tmp/molt-pack/*.tgz
+          bun -e "import('@molt/runtime').then((m) => { if (!m) process.exit(1); }).catch((e) => { console.error(e); process.exit(1); })"
       - name: deno smoke (G8, P5-6)
         uses: denoland/setup-deno@v2
         with:
