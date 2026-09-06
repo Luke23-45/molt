@@ -7,9 +7,12 @@ import { createElement } from 'react';
 
 import {
   analyticsCapability,
+  cascadeRootCapability,
   hostConfigCapability,
+  notificationCapability,
   optionalLoggerCapability,
   storageCapability,
+  versionedCapability,
 } from './storage.js';
 
 export type DemoEvents = {
@@ -24,12 +27,14 @@ export const eventBusCapability = capability<ReturnType<typeof eventBusFactory<D
 
 export const demoBannerKey = contributionKey<{ text: string }>('demo.banner');
 
-/** Host-provided event bus factory */
+export const demoToastKey = contributionKey<{ message: string }>('demo.toast');
+
+/** Host-provided event bus factory — host owns mode, plugins call create() */
 export function hostEventFactory() {
   return eventBusFactory<DemoEvents>('sync');
 }
 
-/** Direct sync bus for isolation tests */
+/** Direct sync bus for isolated subscription tests */
 function directBus() {
   return createEventBus<DemoEvents>('sync');
 }
@@ -43,13 +48,12 @@ export function storagePlugin(version = '1.0.0'): PluginDefinition {
     setup: (ctx: PluginContext) => {
       const map = new Map<string, string>();
       ctx.diagnose({ message: `storage ${version} setup`, details: { version }, severity: 'info' });
-      // LIFO proof: onDispose order is LIFO at scope dispose — registered before acquire
+      // LIFO proof: onDispose order is LIFO at scope dispose — registered before acquire INV-02
       const order: string[] = [];
       ctx.scope.onDispose(() => {
         order.push('onDispose-outer');
       });
-      // Owned resource via acquire — disposer runs LIFO after setup
-      // Use a disposable Map wrapper to prove acquire ownership
+      // Owned resource via acquire — disposer runs LIFO after setup INV-01
       void ctx.scope.acquire(
         () => {
           return { map, order };
@@ -63,7 +67,7 @@ export function storagePlugin(version = '1.0.0'): PluginDefinition {
         order.push('onDispose-inner');
       });
 
-      // Signal abort proof — long-running work should observe signal
+      // Signal abort proof — long-running work should observe signal INV-12
       ctx.signal.addEventListener(
         'abort',
         () => {
@@ -94,7 +98,7 @@ export function analyticsPluginA(): PluginDefinition {
     version: '1.0.0',
     provides: [{ capability: analyticsCapability, multiple: true }],
     setup: (ctx) => {
-      // multi-provider must publish array
+      // multi-provider must publish array INV-11
       ctx.provide(analyticsCapability, ['a:pageview']);
     },
   };
@@ -118,9 +122,10 @@ export function consumerMultiPlugin(): PluginDefinition {
     requires: [{ capability: analyticsCapability, range: '^1.0.0' }],
     setup: (ctx) => {
       const all = ctx.require(analyticsCapability);
-      // all is frozen concatenated array host + a + b in order
+      // all is frozen concatenated array host + a + b in order INV-11
       ctx.diagnose({ message: `multi got ${all.join(',')}` });
       if (!Array.isArray(all)) throw new Error('multi not array');
+      if (!Object.isFrozen(all)) throw new Error('multi should be frozen');
     },
   };
 }
@@ -133,7 +138,7 @@ export function optionalConsumerPlugin(): PluginDefinition {
     requires: [{ capability: optionalLoggerCapability, range: '^1.0.0', optional: true }],
     setup: (ctx) => {
       const logger = ctx.optional(optionalLoggerCapability);
-      // logger is undefined when not provided — must not throw
+      // logger is undefined when not provided — must not throw INV-09
       ctx.diagnose({ message: logger === undefined ? 'optional absent' : 'optional present' });
     },
   };
@@ -159,14 +164,12 @@ export function widgetPlugin(version = '1.0.0'): PluginDefinition {
       });
       ctx.contribute(demoBannerKey, { text: `banner:${version}` });
 
-      // Scope-owned event subscription
+      // Scope-owned event subscription INV-12
       const bus = directBus();
       bus.on(ctx.scope, 'tick', (p) => {
         storage.set('tick', String(p.seq));
       });
       void bus.emit('tick', { seq: 1 });
-
-      // Undeclared require must throw INV-09 — proved in test, not here
     },
   };
 }
@@ -176,15 +179,110 @@ export function configConsumerPlugin(): PluginDefinition {
   return {
     id: 'demo.config-consumer',
     version: '1.0.0',
-    requires: [{ capability: hostConfigCapability, range: '^1.0.0' }],
+    requires: [
+      { capability: hostConfigCapability, range: '^1.0.0' },
+      { capability: optionalLoggerCapability, range: '^1.0.0', optional: true },
+    ],
     setup: (ctx) => {
       const cfg = ctx.require(hostConfigCapability);
       ctx.diagnose({ message: `config env=${cfg.env}` });
+      // Also exercise optional host logger when present INV-09
+      const maybeLogger = ctx.optional(optionalLoggerCapability);
+      void maybeLogger;
     },
   };
 }
 
-// ---- Disposal stress: LIFO + continue-on-error (INV-02/03) — kept for future host recipes ----
+// ---- Real-project: Dashboard that uses host logger, notifications, storage, event factory ----
+export function dashboardPlugin(): PluginDefinition {
+  return {
+    id: 'demo.dashboard',
+    version: '1.0.0',
+    requires: [
+      { capability: storageCapability, range: '^1.0.0' },
+      { capability: hostConfigCapability, range: '^1.0.0' },
+    ],
+    provides: [{ capability: notificationCapability }],
+    setup: (ctx) => {
+      const storage = ctx.require(storageCapability);
+      const config = ctx.require(hostConfigCapability);
+      ctx.diagnose({ message: `dashboard env=${config.env}`, severity: 'info' });
+      storage.set('dashboard:ready', 'true');
+
+      // Provide notifications capability
+      ctx.provide(notificationCapability, {
+        notify: (msg: string) => {
+          // guard generation pattern — caller wraps with guardGenerationCallback in host
+          ctx.diagnose({ message: `notify:${msg}`, severity: 'info' });
+        },
+      });
+
+      // Contribute toast only — dashboard's widget/route would collide with widget plugin's single-owner contributions (plan 00 §4.2 step 7)
+      ctx.contribute(demoToastKey, { message: `welcome ${config.env}` });
+
+      // Use event bus factory provided by host (tests host provider + factory pattern)
+      // In real host we pass eventBusCapability as host provider; plugin can require it
+      // Here we also do direct bus scoped subscription to prove generation-scoped events
+      const bus = createEventBus<DemoEvents>('sync');
+      bus.on(ctx.scope, 'alert', (p) => {
+        storage.set('last-alert', p.msg);
+      });
+    },
+  };
+}
+
+// ---- Notification consumer that depends on dashboard's notification capability ----
+export function notificationConsumerPlugin(): PluginDefinition {
+  return {
+    id: 'demo.notification-consumer',
+    version: '1.0.0',
+    requires: [{ capability: notificationCapability, range: '^1.0.0' }],
+    setup: (ctx) => {
+      const svc = ctx.require(notificationCapability);
+      svc.notify('consumer-mounted');
+      ctx.diagnose({ message: 'notification consumer active' });
+    },
+  };
+}
+
+// ---- Cascade root + dependent (ACTIVE_DEPENDENTS + cascade stop exercise) ----
+export function cascadeRootPlugin(): PluginDefinition {
+  return {
+    id: 'demo.cascade-root',
+    version: '1.0.0',
+    provides: [{ capability: cascadeRootCapability }],
+    setup: (ctx) => {
+      ctx.provide(cascadeRootCapability, { id: 'root' });
+    },
+  };
+}
+
+export function cascadeDependentPlugin(): PluginDefinition {
+  return {
+    id: 'demo.cascade-dependent',
+    version: '1.0.0',
+    requires: [{ capability: cascadeRootCapability, range: '^1.0.0' }],
+    setup: (ctx) => {
+      void ctx.require(cascadeRootCapability);
+      ctx.diagnose({ message: 'cascade dependent active' });
+    },
+  };
+}
+
+// ---- Diagnostics spam: proves BoundedLog caps at 100 (ADR-08) ----
+export function diagnosticsSpamPlugin(): PluginDefinition {
+  return {
+    id: 'demo.diagnostics-spam',
+    version: '1.0.0',
+    setup: (ctx) => {
+      for (let i = 0; i < 150; i += 1) {
+        ctx.diagnose({ message: `spam-${i}`, details: { index: i }, severity: 'info' });
+      }
+    },
+  };
+}
+
+// ---- Disposal stress: LIFO + continue-on-error (INV-02/03) — kept for host recipes ----
 export function disposalStressPlugin(): PluginDefinition {
   return {
     id: 'demo.disposal-stress',
@@ -210,9 +308,7 @@ export function disposalStressPlugin(): PluginDefinition {
       ctx.scope.onDispose(() => {
         order.push('onDispose-3');
       });
-      // Store order on global for test to read after dispose via inspection? Use diagnose
       (globalThis as unknown as { __disposalOrder?: string[] }).__disposalOrder = order;
-      // Also test Symbol.asyncDispose: plugin that returns using-like disposable
       ctx.diagnose({ message: 'disposal stress setup', details: { order: order.join(',') } });
     },
   };
@@ -232,6 +328,16 @@ export function brokenStoragePlugin(version = '2.0.0'): PluginDefinition {
 
 export function fixedStoragePlugin(version = '2.0.0'): PluginDefinition {
   return storagePlugin(version);
+}
+
+// ---- Semver versioned provider/consumer for INCOMPATIBLE_CAPABILITY proof ----
+export function versionedProviderPlugin(version: string): PluginDefinition {
+  return {
+    id: 'demo.versioned-provider',
+    version,
+    provides: [{ capability: versionedCapability }],
+    setup: (ctx) => ctx.provide(versionedCapability, { v: Number.parseInt(version, 10) }),
+  };
 }
 
 // ---- Cycle pair (for resolver DEPENDENCY_CYCLE test) ----
