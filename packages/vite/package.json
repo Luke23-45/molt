@@ -1,6 +1,6 @@
 {
   "name": "@molt/vite",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Vite HMR bridge that maps module updates to Molt lifecycle operations.",
   "keywords": [
     "vite",
