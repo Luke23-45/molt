@@ -6,7 +6,7 @@ Instructions for AI coding agents working in this repository. Followed by Codex,
 
 **Molt** is a general plugin runtime for safe replacement, in TypeScript, published as the `@molt/*` npm packages. Thesis: _a plugin is a versioned capability provider running inside an owned resource scope; a replacement is prepared in isolation, committed only after successful preparation, and followed by disposal of the previous generation._
 
-Status: **`@molt/runtime` implemented and packaged, but P1 is not release-ready until remote CI and P0-A1 are complete.** All 11 core modules exist; unit, property, stress, coverage, architecture, packaging, build, and API gates are green locally. The dual ESM/CJS build emits `dist/` with publint/attw green, and the reviewed API file is warning-free (`packages/runtime-core/etc/api/runtime.api.md`). Read [`docs/implement_plan/07-readiness-and-remaining-work.md`](docs/implement_plan/07-readiness-and-remaining-work.md) and the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before calling the release ready.
+Status: **P1/P2/P3 are complete (all local gates green, revalidated 2026-09-07); the remaining open items are remote evidence, not implementation.** All 11 core modules exist; unit, property, stress, coverage, architecture, packaging, build, API, adapter, browser, mutation, and docs gates are green locally, and `pnpm release:dry-run` passes. Still open: branch protection on `main` (P0-A1, owner action), the remote CI matrix (P1-E9), human API sign-off (P1-E11), the release-branch benchmark artifact run (P3-8), and the npm/GitHub publication prerequisites (P5-1/P5-3). Read [`docs/implement_plan/07-readiness-and-remaining-work.md`](docs/implement_plan/07-readiness-and-remaining-work.md) and the progress log in [`docs/implement_plan/ledger.md`](docs/implement_plan/ledger.md) before calling the release ready.
 
 ## Authority chain — read in this order
 
@@ -28,6 +28,8 @@ pnpm check:pkg                # publint + arethetypeswrong per package
 pnpm check:arch               # dependency-cruiser core-purity rules
 pnpm check:api                # api-extractor diff vs reviewed API files
 pnpm bench                    # comparison demo (naive registry vs Cordis vs Molt)
+pnpm mutation                 # Stryker mutation experiment on scope.ts + runtime.ts
+pnpm docs:build               # TypeDoc API reference site (docs/api/, gitignored)
 ```
 
 `build`, `check:pkg`, and `check:api` exit successfully with no API Extractor warnings. `test:property` and `test:stress` pass locally with both fixed and random property seeds; the node/OS remote matrix remains pending P0-A1.

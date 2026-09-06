@@ -25,8 +25,8 @@ docs/
   notes/01…08              # DESIGN: thesis, boundaries, guarantees, positioning — decided
   implement_plan/00…06     # EXECUTION: architecture, layout, gates, specs, tests — binding
   implement_plan/ledger.md # TRACKER: every deliverable as a checkable item
-packages/                  # runtime-core, test, events, react, vite (created per phase)
-examples/                  # command-host, worker-host (P2)
+packages/                  # runtime-core, test, events, react, vite
+examples/                  # command-host, worker-host (P2), integration-demo
 demo/comparison/           # three-way demo: naive registry vs Cordis vs Molt (P3)
 ```
 
@@ -38,7 +38,7 @@ demo/comparison/           # three-way demo: naive registry vs Cordis vs Molt (P
 
 ## Status check — always do this first
 
-Read the progress log at the bottom of `docs/implement_plan/ledger.md` and the first unchecked item. Never assume a package, script, or gate exists without a checked ledger item saying so. As of the 2026-08-31 session: the core is implemented and packaged (build, publint/attw, and the warning-free reviewed API file all exist), the property/stress suites pass locally with fixed and random seeds, and the open items are remote CI matrix validation (E9, needs the P0-A1 push), the formal PR-linked ledger ticks, and the push itself.
+Read the progress log at the bottom of `docs/implement_plan/ledger.md` and the first unchecked item. Never assume a package, script, or gate exists without a checked ledger item saying so. As of the 2026-09-07 session: P1/P2/P3 are complete with every local gate green (including the Stryker mutation experiment, the TypeDoc docs build, and the release dry run); the open items are remote evidence and owner actions only — branch protection on `main` (P0-A1), the remote CI matrix (P1-E9), human API sign-off (P1-E11), the release-branch artifact run (P3-8), and the npm publication prerequisites (P5-1/P5-3).
 
 ## Non-negotiables (full lists in the referenced docs)
 

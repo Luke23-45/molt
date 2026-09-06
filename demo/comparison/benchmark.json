@@ -6,7 +6,7 @@
       "oldGenerationServedAfterFailure": false,
       "leakedResourcesAfterCleanup": 102,
       "blockedDiagnostic": "not available: no dependency graph",
-      "averageMilliseconds": 0.07932
+      "averageMilliseconds": 0.024756012834821428
     },
     {
       "runner": "cordis",
@@ -14,7 +14,7 @@
       "oldGenerationServedAfterFailure": false,
       "leakedResourcesAfterCleanup": 0,
       "blockedDiagnostic": "not available: dependency policy is host-defined",
-      "averageMilliseconds": 321.85187999999994
+      "averageMilliseconds": 99.78185714285715
     },
     {
       "runner": "@molt/runtime",
@@ -22,7 +22,7 @@
       "oldGenerationServedAfterFailure": true,
       "leakedResourcesAfterCleanup": 0,
       "blockedDiagnostic": "ACTIVE_DEPENDENTS:demo.consumer>demo.plugin",
-      "averageMilliseconds": 42.45327999999996
+      "averageMilliseconds": 11.75481
     }
   ]
 }
