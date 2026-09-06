@@ -40,4 +40,4 @@ The executable engineering plan for these notes lives in [../implement_plan/](..
 - Name: **Molt**. The rationale and the rejected alternatives are recorded in [8](./08-positioning-and-related-work.md).
 - npm scope: `@molt` (for example `@molt/runtime`, `@molt/react`, `@molt/vite`, `@molt/test`). The unscoped `molt` package on npm is a dormant one-off and is not ours to claim.
 - Directory names such as `runtime-core` remain working names; published names use the scope.
-- The `github.com/molt` account is a dormant personal account, not a project collision. The repository should live under `moltjs` (available at the time of writing) or the author's account.
+- The `github.com/molt` account is a dormant personal account, not a project collision. The repository lives at `github.com/Luke23-45/molt` under the author's account (decided 2026-09-07; the planned `moltjs` organization was never created, and the remote, package metadata, and publication docs already point there).

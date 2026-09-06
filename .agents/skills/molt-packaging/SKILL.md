@@ -3,7 +3,7 @@ name: molt-packaging
 description: Packaging and release rules for the @molt npm packages — the exports map, dual ESM/CJS build with tsdown, publint and arethetypeswrong gates, the api-extractor API review workflow, changesets with npm provenance, and the dependency policy for runtime-core. Use when changing any package.json, the public API surface, the build configuration, or when preparing a release.
 license: MIT
 metadata:
-  author: moltjs
+  author: molt
   version: "1.0"
 ---
 

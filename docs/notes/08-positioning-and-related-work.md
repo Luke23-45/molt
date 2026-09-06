@@ -53,5 +53,5 @@ Publication notes (checked 2026-08-30):
 
 - the unscoped npm packages `molt`, `escrow`, `chrysalis`, and `baton` exist but are dormant one-offs; none is a live collision;
 - publishing under the `@molt` scope avoids the reserved unscoped name entirely;
-- `github.com/molt` is a dormant personal account, not a project; `github.com/moltjs` is available;
+- `github.com/molt` is a dormant personal account, not a project; the repository lives at `github.com/Luke23-45/molt` under the author's account (amended 2026-09-07: the `moltjs` organization was never created);
 - a Python tool called PyMolt already uses the molt metaphor for dependency upgrades, which confirms the metaphor reads correctly to developers; it is a different ecosystem and a different problem.

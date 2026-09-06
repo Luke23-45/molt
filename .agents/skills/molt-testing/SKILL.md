@@ -3,7 +3,7 @@ name: molt-testing
 description: How tests are written in the Molt repository — invariant-named tests (INV-xx), the nine transaction gates T-R1..T-R9 that are release blockers, fast-check property-based testing with reference models, coverage thresholds, and the forbidden test patterns. Use when writing, changing, or reviewing any test file, or when a change might affect lifecycle behavior.
 license: MIT
 metadata:
-  author: moltjs
+  author: molt
   version: '1.0'
 ---
 

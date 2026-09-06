@@ -3,7 +3,7 @@ name: molt-coding-standards
 description: TypeScript and code-style rules for all Molt packages — strict compiler options, the file-by-file contract for runtime-core, the MoltError model with its 11 error codes, comment and JSDoc policy, and the forbidden-constructs list. Use when writing, refactoring, or reviewing any TypeScript code in packages/, examples/, or demo/.
 license: MIT
 metadata:
-  author: moltjs
+  author: molt
   version: "1.0"
 ---
 

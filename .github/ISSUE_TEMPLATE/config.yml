@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Contributing guide
-    url: https://github.com/moltjs/molt/blob/main/CONTRIBUTING.md
+    url: https://github.com/Luke23-45/molt/blob/main/CONTRIBUTING.md
     about: Setup, ledger workflow, PR checklist, and the non-negotiables.

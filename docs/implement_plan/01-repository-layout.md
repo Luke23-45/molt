@@ -5,7 +5,7 @@ The repository is a pnpm-workspace monorepo, following the layout conventions of
 ## 1. Final repository tree
 
 ```text
-moltjs/
+molt/
 ├── .github/
 │   ├── workflows/            # verify.yml, release.yml (see 06)
 │   ├── ISSUE_TEMPLATE/       # bug report, lifecycle-semantics report, feature
@@ -20,7 +20,8 @@ moltjs/
 │   └── vite/                 # @molt/vite           (P3)
 ├── examples/
 │   ├── command-host/         # unrelated host #1    (P2)
-│   └── worker-host/          # unrelated host #2    (P2)
+│   ├── worker-host/          # unrelated host #2    (P2)
+│   └── integration-demo/     # full-public-surface integration host (added post-P3, 2026-09-07)
 ├── demo/
 │   └── comparison/           # three-way demo vs naive registry + Cordis (P3)
 ├── docs/                     # design notes + this plan (already present)

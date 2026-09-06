@@ -3,7 +3,7 @@ name: molt-orientation
 description: Orients any agent in the Molt repository — what the project is, where design authority lives (docs/notes), where the binding engineering plan lives (docs/implement_plan), how the ledger tracks work, and the current build status. Use when starting any session or task in this repository, before reading or changing any file.
 license: MIT
 metadata:
-  author: moltjs
+  author: molt
   version: '1.0'
 ---
 

@@ -3,7 +3,7 @@ name: molt-lifecycle-semantics
 description: The binding lifecycle semantics of the Molt plugin runtime — invariant registry INV-01..INV-15, plugin state machine, two-phase replacement protocol, disposal engine, and the concurrency model with its deadlock rules. Use before touching any runtime-core source file, especially scope.ts, resolver.ts, or runtime.ts, and before any refactor that would simplify lifecycle behavior.
 license: MIT
 metadata:
-  author: moltjs
+  author: molt
   version: "1.0"
 ---
 

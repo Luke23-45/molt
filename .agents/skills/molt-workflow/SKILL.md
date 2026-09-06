@@ -3,7 +3,7 @@ name: molt-workflow
 description: The Molt development workflow — ledger ticking rules, the four-part Definition of Done, PR requirements (invariants touched, gates run), the design-note amendment sync rule, branch policy, and phase discipline. Use when completing any task from docs/implement_plan/ledger.md, opening a pull request, or deciding what to work on next.
 license: MIT
 metadata:
-  author: moltjs
+  author: molt
   version: '1.0'
 ---
 
