@@ -2,3 +2,5 @@ coverage/
 dist/
 temp/
 etc/
+.stryker-tmp/
+reports/

@@ -3,6 +3,9 @@
   "ignoreBinaries": ["typecheck", "lint", "api-extract"],
   "ignoreDependencies": ["@arethetypeswrong/cli", "publint"],
   "workspaces": {
+    "packages/runtime-core": {
+      "entry": ["vitest.stryker.config.ts"]
+    },
     "demo/comparison": {
       "entry": ["bench.ts"],
       "project": ["**/*"]

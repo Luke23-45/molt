@@ -2,6 +2,13 @@
   "name": "@molt/events",
   "version": "0.0.0",
   "description": "Generation-scoped typed event capability for Molt hosts and plugins.",
+  "keywords": [
+    "events",
+    "event-bus",
+    "typed-events",
+    "plugin-runtime",
+    "lifecycle"
+  ],
   "type": "module",
   "license": "MIT",
   "repository": {

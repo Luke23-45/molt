@@ -2,6 +2,13 @@
   "name": "@molt/test",
   "version": "0.0.0",
   "description": "Public test host utilities for proving Molt ownership and replacement behavior.",
+  "keywords": [
+    "testing",
+    "test-utils",
+    "leak-detection",
+    "plugin-runtime",
+    "lifecycle"
+  ],
   "type": "module",
   "license": "MIT",
   "repository": {

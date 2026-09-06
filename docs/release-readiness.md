@@ -12,6 +12,7 @@ below are completed and the version pull request is reviewed and merged.
 | Independent hosts              | Ready locally                                  | `examples/command-host`, `examples/worker-host`, `pnpm test:adapters`                                                       |
 | Replacement and leak evidence  | Regenerated locally and uploaded by release CI | `demo/comparison/RESULTS.md`, `demo/comparison/benchmark.json`, `pnpm bench`                                                |
 | Browser smoke                  | Ready locally and wired into release CI        | `pnpm test:browser`                                                                                                         |
+| API reference docs             | Ready locally; deployed by CI on version tags  | `pnpm docs:build` (TypeDoc output in `docs/api/`), `.github/workflows/docs.yml`                                             |
 | Limitations                    | Documented                                     | root `README.md`, `packages/runtime-core/README.md`, and design note [01](notes/01-thesis-and-boundaries.md)                |
 | Invariant failures             | No known failures in the local suites          | INV-01 through INV-15 are covered by the unit, transaction, property, stress, host, and adapter suites                      |
 | Simple-registry comparison     | Included                                       | `demo/comparison/RESULTS.md` and the root README comparison section                                                         |
@@ -60,6 +61,9 @@ These actions cannot be completed by repository files alone:
 5. Protect `main` with pull requests, required `verify` and `release` checks,
    linear history, and no administrator bypass. Protect release tags if the
    repository plan supports tag rules.
+6. Enable GitHub Pages with "GitHub Actions" as the build source. The
+   `docs` workflow builds the TypeDoc API reference on every version tag
+   (`v*`) and deploys it; nothing is published until Pages is enabled.
 
 Trusted publishing uses short-lived OIDC credentials; no long-lived npm
 publish token belongs in this repository. The release workflow requires Node

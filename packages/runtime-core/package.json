@@ -2,6 +2,16 @@
   "name": "@molt/runtime",
   "version": "0.0.0",
   "description": "A general plugin runtime for safe replacement.",
+  "keywords": [
+    "plugin-runtime",
+    "plugins",
+    "lifecycle",
+    "dependency-injection",
+    "hot-reload",
+    "resource-management",
+    "graceful-shutdown",
+    "typescript"
+  ],
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -44,13 +54,16 @@
     "lint": "eslint . && prettier --check .",
     "test": "vitest run",
     "build": "tsdown",
-    "api-extract": "api-extractor run --local"
+    "api-extract": "api-extractor run --local",
+    "mutation": "stryker run"
   },
   "dependencies": {
     "semver": "^7.8.5"
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.59.0",
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/semver": "^7.8.0",
     "fast-check": "^4.9.0",
     "tsdown": "^0.22.14"

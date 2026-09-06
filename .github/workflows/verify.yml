@@ -111,6 +111,25 @@ jobs:
         uses: oven-sh/setup-bun@v2
       - name: bun smoke run (G8, ADR-13)
         run: bun -e "import('@molt/runtime').then((m) => { if (!m) process.exit(1); })"
+      - name: deno smoke (G8, P5-6)
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: deno smoke run (G8, P5-6)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/molt-deno-pack
+          pnpm --filter @molt/runtime pack --pack-destination /tmp/molt-deno-pack
+          smoke_dir="$(mktemp -d)"
+          cd "$smoke_dir"
+          npm init -y >/dev/null
+          npm install /tmp/molt-deno-pack/*.tgz
+          cat > smoke.mjs <<'EOF'
+          const m = await import('@molt/runtime');
+          if (!m) throw new Error('deno smoke: empty module');
+          EOF
+          deno run --no-lock smoke.mjs
 
   adapters:
     # P2/P3 adapter and unrelated-host replacement/leak suites.

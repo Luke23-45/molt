@@ -31,6 +31,7 @@
     "bench": "pnpm --filter ./demo/comparison bench",
     "changeset": "changeset",
     "release:dry-run": "node scripts/release-dry-run.mjs",
+    "docs:build": "typedoc",
     "test:coverage": "vitest run --project unit --coverage",
     "test:dom": "vitest run --project unit-dom"
   },
@@ -46,6 +47,7 @@
     "knip": "^6.33.0",
     "prettier": "^3.9.6",
     "publint": "^0.3.24",
+    "typedoc": "^0.28.20",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.68.0",
     "vitest": "^4.1.11"

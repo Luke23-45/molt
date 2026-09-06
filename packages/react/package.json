@@ -2,6 +2,13 @@
   "name": "@molt/react",
   "version": "0.0.0",
   "description": "React adapter for committed, generation-scoped Molt contributions.",
+  "keywords": [
+    "react",
+    "react-hooks",
+    "adapter",
+    "plugin-runtime",
+    "lifecycle"
+  ],
   "type": "module",
   "license": "MIT",
   "repository": {

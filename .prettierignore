@@ -3,4 +3,6 @@ pnpm-lock.yaml
 **/coverage/
 **/etc/api-temp/
 **/temp/
+**/.stryker-tmp/
+**/reports/
 node_modules/

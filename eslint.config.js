@@ -7,7 +7,14 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', 'pnpm-lock.yaml'],
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '**/.stryker-tmp/**',
+      '**/reports/**',
+      'pnpm-lock.yaml',
+    ],
   },
   {
     // Root-level TypeScript configs (no package tsconfig owns them).

@@ -1,5 +1,8 @@
 # Molt
 
+[![verify](https://github.com/Luke23-45/molt/actions/workflows/verify.yml/badge.svg)](https://github.com/Luke23-45/molt/actions/workflows/verify.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A general plugin runtime for safe replacement, in TypeScript.
 
 > **Thesis** — a plugin is a versioned capability provider running inside an
